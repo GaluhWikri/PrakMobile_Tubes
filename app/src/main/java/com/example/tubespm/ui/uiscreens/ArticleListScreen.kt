@@ -1,10 +1,15 @@
 package com.example.tubespm.ui.uiscreens
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.GridItemSpan // Import yang benar
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -21,6 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.tubespm.data.model.Article
@@ -35,15 +42,14 @@ fun ArticleListScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToCreate: () -> Unit,
     onNavigateToEdit: (String) -> Unit,
-    onNavigateToLogin: () -> Unit, // Callback untuk navigasi ke Login setelah logout
+    onNavigateToLogin: () -> Unit,
     viewModel: ArticleListViewModel = hiltViewModel()
 ) {
     val articles by viewModel.articles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    var showDeleteDialog by remember { mutableStateOf<Article?>(null) }
     val context = LocalContext.current
 
-    LaunchedEffect(key1 = Unit) { // Menggunakan Unit agar hanya dijalankan sekali saat komposisi awal
+    LaunchedEffect(key1 = Unit) {
         viewModel.logoutEvent.collectLatest { event ->
             when (event) {
                 is ArticleListViewModel.LogoutEvent.Success -> {
@@ -58,356 +64,354 @@ fun ArticleListScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.refresh() // Pindahkan refresh ke LaunchedEffect terpisah jika hanya ingin load awal
-        viewModel.deleteResult.collectLatest { result -> // Gunakan collectLatest juga di sini
+        viewModel.refresh()
+        viewModel.deleteResult.collectLatest { result ->
             if (result.isFailure) {
                 Toast.makeText(context, "Gagal menghapus artikel: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
             }
-            // Refresh sudah dihandle di dalam deleteArticle pada ViewModel jika sukses
         }
     }
 
+    val bottomBarHeight = 72.dp
+    val fabSize = 64.dp
+    val fabOffset = (bottomBarHeight / 2) + (fabSize / 4)
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "BOOOOM BLOG",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary, // Tambahkan jika ada nav icon
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary // Warna untuk action icons
-                ),
-                actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            // tint = MaterialTheme.colorScheme.onPrimary // Sudah diatur oleh actionIconContentColor
-                        )
-                    }
-                    // Tombol Logout
-                    IconButton(onClick = {
-                        // Opsional: Tambahkan dialog konfirmasi sebelum logout
-                        viewModel.performLogout()
-                    }) {
-                        Icon(
-                            Icons.Default.Logout, // atau Icons.Filled.ExitToApp
-                            contentDescription = "Logout",
-                            // tint = MaterialTheme.colorScheme.onPrimary // Sudah diatur oleh actionIconContentColor
-                        )
-                    }
-                }
-            )
+            Column(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Discover",
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Text(
+                    "New articles",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                CategoryChips(
+                    categories = listOf("Comedy", "Adventure", "Cosmos", "Winter Sports", "Nature", "Tech"),
+                    selectedCategory = "Cosmos",
+                    onCategorySelected = { /* TODO: Handle category selection */ }
+                )
+            }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            FloatingActionButton(
                 onClick = onNavigateToCreate,
-                icon = { Icon(Icons.Default.Add, contentDescription = "Add") },
-                text = { Text("Buat Artikel") },
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary // Pastikan kontras
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape,
+                modifier = Modifier
+                    .size(fabSize)
+                    .offset(y = fabOffset)
+                    .zIndex(1f)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Buat Artikel", modifier = Modifier.size(32.dp))
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center,
+        bottomBar = {
+            BottomNavigationBar(
+                height = bottomBarHeight,
+                onHomeClick = { /* TODO: Navigasi Home */ },
+                onChatClick = { /* TODO: Navigasi Chat */ },
+                onNotificationsClick = { /* TODO: Navigasi Notifikasi */ },
+                onSettingsClick = { /* TODO: Navigasi Settings */ },
+                onLogoutClick = { viewModel.performLogout() }
             )
         }
     ) { paddingValues ->
-        Box(
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.background,
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
-                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(paddingValues) // Menggunakan paddingValues dari Scaffold
+                .padding(horizontal = 8.dp),
+            contentPadding = PaddingValues(
+                top = 8.dp, // Jarak dari CategoryChips ke item grid pertama
+                bottom = (fabSize / 2) + 8.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (isLoading && articles.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
+                // *** PERBAIKAN DI SINI ***
+                item(span = { GridItemSpan(maxLineSpan) }) { // Menggunakan maxLineSpan dari scope
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "Memuat artikel...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
-            } else if (articles.isEmpty() && !isLoading) { // Tambahkan !isLoading untuk kondisi empty state
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
+            } else if (articles.isEmpty() && !isLoading) {
+                // *** PERBAIKAN DI SINI ***
+                item(span = { GridItemSpan(maxLineSpan) }) { // Menggunakan maxLineSpan dari scope
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.Inbox, // Ganti ikon jika lebih sesuai
-                            contentDescription = "Tidak ada artikel",
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             "Belum ada artikel",
                             style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            "Mulai dengan membuat artikel pertama Anda!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(articles, key = { article -> article.id }) { article -> // Tambahkan key untuk performa
-                        ModernArticleCard(
-                            article = article,
-                            onClick = { onNavigateToDetail(article.id) },
-                            onEdit = { onNavigateToEdit(article.id) },
-                            onDelete = { showDeleteDialog = article }
-                        )
-                    }
+                items(articles, key = { article -> article.id }) { article ->
+                    DiscoverArticleCard(
+                        article = article,
+                        onClick = { onNavigateToDetail(article.id) }
+                    )
                 }
             }
         }
     }
+}
 
-    showDeleteDialog?.let { article ->
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = null },
-            title = { Text("Hapus Artikel") },
-            text = { Text("Apakah Anda yakin ingin menghapus artikel '${article.title}'?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteArticle(article)
-                        showDeleteDialog = null
-                    }
-                ) {
-                    Text("Hapus", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = null }) {
-                    Text("Batal")
-                }
-            }
+// Composable CategoryChips, Chip, DiscoverArticleCard, BottomNavigationBar, dan BottomNavItem tetap sama
+// ... (Kode untuk Composable lain tidak berubah dari respons sebelumnya)
+@Composable
+fun CategoryChips(
+    categories: List<String>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        categories.forEach { category ->
+            Chip(
+                label = category,
+                isSelected = category == selectedCategory,
+                onClick = { onCategorySelected(category) }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun Chip(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    val backgroundAlpha = if (isSelected) 1f else 0.1f
+    val contentAlpha = if (isSelected) 1f else 0.7f
+    val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(50),
+        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = backgroundAlpha),
+        border = if (!isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) else null,
+        contentColor = textColor.copy(alpha = contentAlpha)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = if(isSelected) FontWeight.Bold else FontWeight.Normal),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
     }
 }
 
-// ModernArticleCard Composable (Tidak ada perubahan signifikan, pastikan warna ikon kontras)
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModernArticleCard(
+fun DiscoverArticleCard(
     article: Article,
-    onClick: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onClick: () -> Unit
 ) {
-    var showMenu by remember { mutableStateOf(false) }
-
     Card(
-        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
+            .aspectRatio(0.75f)
             .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(16.dp),
-                ambientColor = Color.Black.copy(alpha = 0.1f),
-                spotColor = Color.Black.copy(alpha = 0.1f)
-            ),
-        shape = RoundedCornerShape(16.dp),
+                elevation = 4.dp,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column {
-            Box {
-                if (article.imageUrl != null && article.imageUrl.isNotBlank()) { // Cek isNotBlank
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                if (article.imageUrl != null && article.imageUrl.isNotBlank()) {
                     AsyncImage(
                         model = article.imageUrl,
-                        contentDescription = "Article Image",
+                        contentDescription = article.title,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
                         contentScale = ContentScale.Crop
-                    )
-                    // Overlay Gradient
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize() // Sesuaikan dengan ukuran AsyncImage
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                                    startY = 0f, // Mulai dari atas
-                                    endY = Float.POSITIVE_INFINITY // Sampai ke bawah
-                                )
-                            )
-                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp) // Sesuaikan tinggi jika tidak ada gambar
-                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                             .background(
                                 Brush.horizontalGradient(
                                     colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
                                     )
                                 )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Filled.ImageNotSupported, // Ikon jika gambar tidak ada
-                            contentDescription = "No image available",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // Menu Tombol (tiga titik)
-                Box(
-                    modifier = Modifier.align(Alignment.TopEnd)
-                ) {
-                    IconButton(
-                        onClick = { showMenu = true },
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .background(
-                                Color.Black.copy(alpha = 0.5f), // Sedikit transparan agar tidak terlalu dominan
-                                RoundedCornerShape(50) // Bulat sempurna
-                            )
-                    ) {
-                        Icon(
-                            Icons.Default.MoreVert,
-                            contentDescription = "Menu",
-                            tint = Color.White // Pastikan ikon terlihat di atas background semi-transparan
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Edit") },
-                            onClick = {
-                                onEdit()
-                                showMenu = false
-                            },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Hapus", color = MaterialTheme.colorScheme.error) },
-                            onClick = {
-                                onDelete()
-                                showMenu = false
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
+                            Icons.Filled.BrokenImage,
+                            contentDescription = "No image",
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
                 }
             }
 
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
             ) {
                 Text(
                     text = article.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, lineHeight = 18.sp),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = article.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp) // Spasi antar ikon dan teks
-                    ) {
-                        Icon(
-                            Icons.Default.Schedule,
-                            contentDescription = "Tanggal",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            // text = article.createdAt.toString(), // Format tanggal jika perlu
-                            text = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-                                .format(article.createdAt),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Tombol "Baca" sederhana
-                    TextButton(onClick = onClick) { // Menggunakan onClick dari parameter Card utama
-                        Text(
-                            text = "Baca Selengkapnya",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Icon(
-                            Icons.Default.ArrowForwardIos,
-                            contentDescription = "Baca",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    Text(
+                        text = SimpleDateFormat("dd MMM, yy", Locale.getDefault()).format(article.createdAt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "5 min read",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun BottomNavigationBar(
+    height: androidx.compose.ui.unit.Dp,
+    onHomeClick: () -> Unit,
+    onChatClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onLogoutClick: () -> Unit
+) {
+    var selectedItem by remember { mutableStateOf(0) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height)
+            .shadow(elevation = 8.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomNavItem(
+                icon = Icons.Filled.Home,
+                label = "Home",
+                isSelected = selectedItem == 0,
+                onClick = { selectedItem = 0; onHomeClick() }
+            )
+            BottomNavItem(
+                icon = Icons.Filled.ChatBubbleOutline,
+                label = "Chat",
+                isSelected = selectedItem == 1,
+                onClick = { selectedItem = 1; onChatClick() }
+            )
+
+            Spacer(modifier = Modifier.width(64.dp))
+
+            BottomNavItem(
+                icon = Icons.Filled.NotificationsNone,
+                label = "Notif",
+                isSelected = selectedItem == 2,
+                onClick = { selectedItem = 2; onNotificationsClick() }
+            )
+            BottomNavItem(
+                icon = Icons.Filled.Tune,
+                label = "Settings",
+                isSelected = selectedItem == 3,
+                onClick = { selectedItem = 3; onSettingsClick() }
+            )
+        }
+    }
+}
+
+@Composable
+fun RowScope.BottomNavItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor,
+            modifier = Modifier.size(26.dp)
+        )
+        if (isSelected) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = contentColor,
+                fontSize = 10.sp
+            )
         }
     }
 }
