@@ -1,7 +1,5 @@
 package com.example.tubespm.data.model
 
-// Data Models
-// Article.kt
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.util.Date
@@ -13,5 +11,6 @@ data class Article(
     val content: String,
     val imageUrl: String?,
     val createdAt: Date,
-    val updatedAt: Date
+    val updatedAt: Date,
+    val authorId: String // Added: Store the author's ID (assuming it's a String like User ID)
 )

@@ -16,6 +16,7 @@ import com.example.tubespm.data.model.LoginRequest
 import com.example.tubespm.data.model.RegisterRequest
 import com.example.tubespm.network.ApiService
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,7 +36,7 @@ class BlogRepository @Inject constructor(
     private val apiUtcDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'", Locale.ENGLISH).apply {
         timeZone = TimeZone.getTimeZone("UTC")
     }
-    private val apiSimpleDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH) // Untuk tanggal saja
+    private val apiSimpleDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
 
     private fun parseApiDateFlexible(dateString: String?): Date {
         if (dateString.isNullOrBlank()) {
@@ -46,11 +47,10 @@ class BlogRepository @Inject constructor(
             apiUtcDateFormat.parse(dateString) ?: Date()
         } catch (e: Exception) {
             try {
-                // Fallback untuk format YYYY-MM-DD jika parsing UTC gagal atau string adalah tanggal saja
                 apiSimpleDateFormat.parse(dateString) ?: Date()
             } catch (e2: Exception) {
                 Log.e("BlogRepository", "Could not parse date: '$dateString'. Error: ${e.message} & ${e2.message}. Returning current date.")
-                Date() // Default ke waktu sekarang jika semua parsing gagal
+                Date()
             }
         }
     }
@@ -61,8 +61,9 @@ class BlogRepository @Inject constructor(
             title = response.title,
             content = response.content,
             imageUrl = response.imageUrl,
-            createdAt = parseApiDateFlexible(response.createdAtApi ?: response.date), // Prioritaskan createdAtApi
-            updatedAt = parseApiDateFlexible(response.updatedAtApi ?: response.createdAtApi ?: response.date)
+            createdAt = parseApiDateFlexible(response.createdAtApi ?: response.date),
+            updatedAt = parseApiDateFlexible(response.updatedAtApi ?: response.createdAtApi ?: response.date),
+            authorId = response.authorId.toString() // Mengonversi Int ke String
         )
     }
 
@@ -71,26 +72,28 @@ class BlogRepository @Inject constructor(
             id = response.id.toString(),
             articleId = response.articleId.toString(),
             content = response.body,
-            authorName = response.user.name,
+            authorName = response.user.name, // Dari objek User yang ada di dalam CommentApiResponse
             userId = response.userId.toString(),
             createdAt = parseApiDateFlexible(response.createdAtApi)
         )
     }
 
-    // --- Article Functions (tetap sama) ---
+    // --- Article Functions ---
     fun getAllArticles(): Flow<List<Article>> = articleDao.getAllArticles()
+
+    fun getArticlesByAuthorId(authorId: String): Flow<List<Article>> {
+        if (authorId.isBlank()) return emptyFlow()
+        return articleDao.getArticlesByAuthorId(authorId)
+    }
 
     suspend fun getArticleById(id: String): Article? {
         var article = articleDao.getArticleById(id)
-        // Selalu coba sinkronisasi dari API untuk detail artikel,
-        // karena mungkin ada update atau komentar baru.
-        // Atau, Anda bisa memiliki tombol refresh manual di UI.
         try {
             Log.d("BlogRepository", "Fetching article $id from API")
             val response = apiService.getArticle(id)
             if (response.isSuccessful && response.body() != null) {
                 val articleEntity = mapResponseToArticleEntity(response.body()!!)
-                articleDao.insertArticle(articleEntity) // Insert or Replace
+                articleDao.insertArticle(articleEntity)
                 Log.d("BlogRepository", "Article $id synced from API.")
                 return articleEntity
             } else if (article != null) {
@@ -157,8 +160,6 @@ class BlogRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 val articleResponse = response.body()!!
                 val articleEntity = mapResponseToArticleEntity(articleResponse)
-                // Pastikan ID yang digunakan untuk update DAO adalah ID yang sama
-                // Mungkin perlu getArticleById dulu jika ID lokal dan server bisa berbeda setelah create
                 articleDao.updateArticle(articleEntity)
                 Result.success(articleEntity)
             } else {
@@ -175,20 +176,37 @@ class BlogRepository @Inject constructor(
 
     suspend fun deleteArticle(article: Article): Result<Unit> {
         return try {
-            val response = apiService.deleteArticle(article.id) // article.id adalah ID server
+            Log.d("BlogRepository", "Attempting to delete article with ID: ${article.id} from API.")
+            val response = apiService.deleteArticle(article.id)
+
             if (response.isSuccessful) {
+                Log.d("BlogRepository", "Article ${article.id} deleted successfully from API. Deleting from local DAO.")
                 articleDao.deleteArticle(article)
                 Result.success(Unit)
             } else {
-                Log.e("BlogRepository", "Failed to delete article on server: ${response.code()} ${response.message()}")
-                Result.failure(Exception("Failed to delete article on server"))
+                val errorMsg = "Failed to delete article ${article.id} on server: ${response.code()} ${response.message()} - ${response.errorBody()?.string()}"
+                Log.e("BlogRepository", errorMsg)
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            Log.e("BlogRepository", "Exception deleting article", e)
+            Log.e("BlogRepository", "Exception deleting article ${article.id}", e)
             Result.failure(e)
         }
     }
 
+
+    // --- User Info from SharedPreferences ---
+    fun getCurrentUserId(): String? {
+        return sharedPreferences.getString("user_id", null)
+    }
+
+    fun getCurrentUserName(): String? {
+        return sharedPreferences.getString("user_name", "Nama Pengguna") // Default value jika tidak ditemukan
+    }
+
+    fun getCurrentUserEmail(): String? {
+        return sharedPreferences.getString("user_email", "email@example.com") // Default value
+    }
 
     // --- Comment Functions ---
     fun getCommentsByArticleId(articleId: String): Flow<List<Comment>> =
@@ -200,13 +218,9 @@ class BlogRepository @Inject constructor(
             val response = apiService.getCommentsForArticle(articleId)
             if (response.isSuccessful) {
                 response.body()?.let { commentApiResponses ->
-                    // Opsi 1: Hapus semua komen lama lalu insert yang baru (jika API adalah source of truth)
-                    // commentDao.deleteAllCommentsByArticleId(articleId)
-                    // Log.d("BlogRepository", "Old comments deleted for article $articleId before sync.")
-
                     val commentsToInsert = commentApiResponses.map { mapCommentResponseToEntity(it) }
                     if (commentsToInsert.isNotEmpty()) {
-                        commentDao.insertComments(commentsToInsert) // Gunakan batch insert
+                        commentDao.insertComments(commentsToInsert)
                         Log.d("BlogRepository", "Comments for article $articleId synced: ${commentsToInsert.size} comments.")
                     } else {
                         Log.d("BlogRepository", "No comments received from API for article $articleId.")
@@ -222,8 +236,8 @@ class BlogRepository @Inject constructor(
 
     suspend fun createComment(articleId: String, commentBody: String): Result<Comment> {
         return try {
-            val request = CreateCommentRequest(body = commentBody)
-            val response = apiService.createComment(articleId, request)
+            val requestBody = CreateCommentRequest(body = commentBody)
+            val response = apiService.createComment(articleId, requestBody)
             if (response.isSuccessful && response.body() != null) {
                 val commentEntity = mapCommentResponseToEntity(response.body()!!)
                 commentDao.insertComment(commentEntity)
@@ -239,17 +253,19 @@ class BlogRepository @Inject constructor(
         }
     }
 
-    suspend fun updateLocalComment(comment: Comment) { // Untuk update dari UI ke local db
+    suspend fun updateLocalComment(comment: Comment) {
         commentDao.updateComment(comment)
     }
 
 
     suspend fun deleteCommentFromApiAndLocal(comment: Comment): Result<Unit> {
         return try {
-            val response = apiService.deleteComment(comment.id) // Asumsi comment.id adalah ID server
+            Log.d("BlogRepository", "Attempting to delete comment with ID: ${comment.id} from API.")
+            val response = apiService.deleteComment(comment.id)
+
             if (response.isSuccessful) {
-                commentDao.deleteComment(comment) // Hapus dari lokal jika sukses di API
-                Log.d("BlogRepository", "Comment ${comment.id} deleted successfully from API and local DB.")
+                Log.d("BlogRepository", "Comment ${comment.id} deleted successfully from API. Deleting from local DAO.")
+                commentDao.deleteComment(comment)
                 Result.success(Unit)
             } else {
                 val errorMsg = "Failed to delete comment ${comment.id} on server: ${response.code()} ${response.message()} - ${response.errorBody()?.string()}"
@@ -262,20 +278,21 @@ class BlogRepository @Inject constructor(
         }
     }
 
-
-    // --- Auth Functions (tetap sama) ---
+    // --- Auth Functions ---
     suspend fun loginUser(loginRequest: LoginRequest): Result<AuthResponse> {
         return try {
             val response = apiService.login(loginRequest)
             if (response.isSuccessful && response.body() != null) {
+                // LoginViewModel akan menangani penyimpanan detail pengguna ke SharedPreferences
+                Log.d("BlogRepository", "Login API call successful for ${loginRequest.email}")
                 Result.success(response.body()!!)
             } else {
                 val errorBody = response.errorBody()?.string() ?: "Unknown login error"
-                Log.e("BlogRepository", "Login failed: ${response.code()} - $errorBody")
+                Log.e("BlogRepository", "Login API call failed: ${response.code()} - $errorBody")
                 Result.failure(Exception("Login failed: $errorBody"))
             }
         } catch (e: Exception) {
-            Log.e("BlogRepository", "Exception during login", e)
+            Log.e("BlogRepository", "Exception during login API call", e)
             Result.failure(e)
         }
     }
@@ -284,41 +301,41 @@ class BlogRepository @Inject constructor(
         return try {
             val response = apiService.register(registerRequest)
             if (response.isSuccessful && response.body() != null) {
+                // RegisterViewModel/LoginViewModel akan menangani penyimpanan detail pengguna ke SharedPreferences jika diperlukan setelah ini
+                Log.d("BlogRepository", "Register API call successful for ${registerRequest.email}")
                 Result.success(response.body()!!)
             } else {
                 val errorBody = response.errorBody()?.string() ?: "Unknown registration error"
-                Log.e("BlogRepository", "Registration failed: ${response.code()} - $errorBody")
+                Log.e("BlogRepository", "Registration API call failed: ${response.code()} - $errorBody")
                 Result.failure(Exception("Registration failed: $errorBody"))
             }
         } catch (e: Exception) {
-            Log.e("BlogRepository", "Exception during registration", e)
+            Log.e("BlogRepository", "Exception during registration API call", e)
             Result.failure(e)
         }
     }
 
     suspend fun logoutUser(): Result<Unit> {
-        return try {
+        try {
             val response = apiService.logout()
             if (response.isSuccessful) {
-                sharedPreferences.edit().apply {
-                    remove("auth_token")
-                    // remove("user_id") // Jika ada user_id yang disimpan
-                }.apply()
-                Log.d("BlogRepository", "Logout API call successful. Local token and session cleared.")
-                Result.success(Unit)
+                Log.d("BlogRepository", "Logout API call successful.")
             } else {
                 val errorBody = response.errorBody()?.string() ?: "Unknown logout error"
-                Log.e("BlogRepository", "Logout API call failed: ${response.code()} - $errorBody")
-                // Tetap hapus token lokal meskipun API gagal, agar user bisa coba login lagi
-                sharedPreferences.edit().remove("auth_token").apply()
-                Log.w("BlogRepository", "Logout API failed, but local token cleared to allow re-login.")
-                Result.failure(Exception("Logout API call failed: $errorBody"))
+                Log.e("BlogRepository", "Logout API call failed: ${response.code()} - $errorBody. Proceeding with local cleanup.")
             }
         } catch (e: Exception) {
-            Log.e("BlogRepository", "Exception during logout: ${e.message}", e)
-            sharedPreferences.edit().remove("auth_token").apply()
-            Log.w("BlogRepository", "Exception during logout, local token cleared to allow re-login.")
-            Result.failure(Exception("Exception during logout: ${e.message}", e))
+            Log.e("BlogRepository", "Exception during logout API call: ${e.message}. Proceeding with local cleanup.", e)
+        } finally {
+            // Selalu bersihkan data sesi lokal terlepas dari hasil panggilan API
+            sharedPreferences.edit().apply {
+                remove("auth_token")
+                remove("user_id")
+                remove("user_name") // Membersihkan nama pengguna
+                remove("user_email") // Membersihkan email pengguna
+            }.apply()
+            Log.d("BlogRepository", "Local token and user details cleared from SharedPreferences.")
         }
+        return Result.success(Unit) // Kembalikan success untuk operasi pembersihan lokal
     }
 }

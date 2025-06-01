@@ -15,7 +15,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CreateEditArticleViewModel @Inject constructor(
-    private val repository: BlogRepository,
+    private val repository: BlogRepository, // Inject BlogRepository
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -31,10 +31,14 @@ class CreateEditArticleViewModel @Inject constructor(
     private val _imageUrl = MutableStateFlow<String?>(null)
     val imageUrl: StateFlow<String?> = _imageUrl.asStateFlow()
 
+    // StateFlow untuk kategori, bisa diinisialisasi dari input pengguna nantinya
+    private val _category = MutableStateFlow("Teknologi") // Contoh default
+    val category: StateFlow<String> = _category.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _saveResult = MutableSharedFlow<Result<Unit>>() // Diubah ke Unit karena kita hanya peduli sukses/gagal navigasi
+    private val _saveResult = MutableSharedFlow<Result<Unit>>()
     val saveResult: SharedFlow<Result<Unit>> = _saveResult.asSharedFlow()
 
     init {
@@ -46,17 +50,13 @@ class CreateEditArticleViewModel @Inject constructor(
     private fun loadArticleForEdit(id: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            // Mengambil data artikel yang ada untuk diedit
-            // Ini akan mengisi field judul, konten, dan imageUrl
-            // Field lain seperti tanggal, penulis, kategori, authorId perlu di-handle
-            // jika ingin ditampilkan atau dikirim kembali saat update.
-            val existingArticle = repository.getArticleById(id) // getArticleById sudah diupdate di repository
+            val existingArticle = repository.getArticleById(id)
             existingArticle?.let {
                 _title.value = it.title
                 _content.value = it.content
                 _imageUrl.value = it.imageUrl
-                // Jika Anda ingin mempertahankan field lain (misal: kategori),
-                // Anda perlu menyimpannya di ViewModel dan memuatnya di sini.
+                // Jika 'category' disimpan di 'Article' entity, muat juga di sini
+                // _category.value = it.category // Contoh
             }
             _isLoading.value = false
         }
@@ -75,13 +75,18 @@ class CreateEditArticleViewModel @Inject constructor(
         _imageUrl.value = newImageUrl
     }
 
+    fun updateCategory(newCategory: String) { // Fungsi untuk update kategori
+        _category.value = newCategory
+    }
+
     fun saveArticle() {
         val currentTitle = _title.value
         val currentContent = _content.value
+        val currentCategory = _category.value // Ambil kategori saat ini
 
-        if (currentTitle.isBlank() || currentContent.isBlank()) {
+        if (currentTitle.isBlank() || currentContent.isBlank() || currentCategory.isBlank()) {
             viewModelScope.launch {
-                _saveResult.emit(Result.failure(Exception("Judul dan Konten harus diisi")))
+                _saveResult.emit(Result.failure(Exception("Judul, Konten, dan Kategori harus diisi")))
             }
             return
         }
@@ -89,21 +94,38 @@ class CreateEditArticleViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
 
-            // TODO: Anda perlu mendapatkan nilai-nilai ini dari input pengguna di CreateEditArticleScreen.kt
-            // Untuk sekarang, kita gunakan placeholder.
+            // --- Mengambil data pengguna yang sedang login ---
+            val currentUserIdString = repository.getCurrentUserId()
+            val currentUserName = repository.getCurrentUserName() ?: "Pengguna Anonim" // Fallback jika nama null
+
+            if (currentUserIdString == null) {
+                _saveResult.emit(Result.failure(Exception("Gagal mendapatkan ID pengguna. Silakan coba login ulang.")))
+                _isLoading.value = false
+                return@launch
+            }
+
+            val currentAuthorId: Int
+            try {
+                currentAuthorId = currentUserIdString.toInt()
+            } catch (e: NumberFormatException) {
+                _saveResult.emit(Result.failure(Exception("Format ID pengguna tidak valid.")))
+                _isLoading.value = false
+                return@launch
+            }
+            // --- Selesai mengambil data pengguna ---
+
             val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            val placeholderAuthorName = "Android User" // Ganti dengan nama pengguna yang sebenarnya
-            val placeholderCategory = "Teknologi"      // Ganti dengan kategori yang dipilih pengguna
-            val placeholderAuthorId = 1              // Ganti dengan ID pengguna yang login (misalnya dari SharedPreferences atau state user)
+            // Kategori diambil dari _category.value
+            // Tanggal bisa juga dibuat input field jika diinginkan
 
             val articleRequest = ArticleRequest(
                 title = currentTitle,
                 content = currentContent,
                 imageUrl = _imageUrl.value,
-                date = currentDate, // Seharusnya tanggal yang dipilih pengguna atau tanggal artikel jika diedit
-                authorName = placeholderAuthorName,
-                category = placeholderCategory,
-                authorId = placeholderAuthorId
+                date = currentDate,
+                authorName = currentUserName, // Gunakan nama pengguna yang login
+                category = currentCategory,   // Gunakan kategori dari state
+                authorId = currentAuthorId    // Gunakan ID pengguna yang login
             )
 
             val result: Result<Article> = if (isEditing && articleId != null) {
@@ -113,8 +135,6 @@ class CreateEditArticleViewModel @Inject constructor(
             }
 
             _isLoading.value = false
-            // Mengirim Result.success atau Result.failure berdasarkan hasil operasi repository
-            // .map { } akan mengubah Result<Article> menjadi Result<Unit>
             _saveResult.emit(result.map { })
         }
     }

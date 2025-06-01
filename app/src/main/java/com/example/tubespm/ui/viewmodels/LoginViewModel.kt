@@ -1,6 +1,6 @@
 package com.example.tubespm.ui.viewmodels
 
-import android.content.SharedPreferences // <-- Import SharedPreferences
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,10 +19,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val repository: BlogRepository,
-    private val sharedPreferences: SharedPreferences // <-- Inject SharedPreferences
+    private val repository: BlogRepository, // BlogRepository might not be strictly needed here if all SharedPreferences logic is in ViewModel
+    private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
+    // ... (StateFlows untuk email, password, isLoading tetap sama) ...
     private val _email = MutableStateFlow("")
     val email: StateFlow<String> = _email.asStateFlow()
 
@@ -31,6 +32,7 @@ class LoginViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
 
     private val _loginResult = MutableSharedFlow<Result<AuthResponse>>()
     val loginResult: SharedFlow<Result<AuthResponse>> = _loginResult.asSharedFlow()
@@ -54,28 +56,52 @@ class LoginViewModel @Inject constructor(
             val loginRequest = LoginRequest(_email.value, _password.value)
             val result = repository.loginUser(loginRequest) // loginUser di repo TIDAK menyimpan token
 
-            // Tangani penyimpanan token di sini setelah repository mengembalikan hasil sukses
             result.onSuccess { authResponse ->
+                val editor = sharedPreferences.edit()
+                var commitFailed = false
+
+                // Save token
                 authResponse.accessToken?.let { token ->
-                    sharedPreferences.edit().putString("auth_token", token).apply()
-                    Log.d("LoginViewModel", "Token saved successfully: $token")
-                    // Simpan data user lain jika perlu
-                    // authResponse.user?.id?.let { userId ->
-                    //     sharedPreferences.edit().putString("user_id", userId.toString()).apply()
-                    // }
+                    editor.putString("auth_token", token)
+                    Log.d("LoginViewModel", "Token to be saved: $token")
                 } ?: run {
-                    // Ini seharusnya tidak terjadi jika API mengembalikan token pada sukses
                     Log.e("LoginViewModel", "Access token is null in successful auth response.")
-                    // Emit kegagalan lagi karena token tidak ada
                     _loginResult.emit(Result.failure(Exception("Login berhasil tetapi token tidak diterima.")))
-                    _isLoading.value = false
-                    return@launch
+                    commitFailed = true
                 }
+
+                if (commitFailed) {
+                    _isLoading.value = false
+                    return@onSuccess
+                }
+
+                // Save user details
+                authResponse.user?.let { user ->
+                    user.id.let { userId -> // Assuming User.id is String and not nullable
+                        editor.putString("user_id", userId)
+                        Log.d("LoginViewModel", "User ID to be saved: $userId")
+                    }
+                    user.name.let { userName -> // Assuming User.name is String and not nullable
+                        editor.putString("user_name", userName)
+                        Log.d("LoginViewModel", "User Name to be saved: $userName")
+                    }
+                    user.email.let { userEmail -> // Assuming User.email is String and not nullable
+                        editor.putString("user_email", userEmail)
+                        Log.d("LoginViewModel", "User Email to be saved: $userEmail")
+                    }
+                } ?: run {
+                    Log.e("LoginViewModel", "User object is null in successful auth response.")
+                    // Consider if this is fatal. For ProfileScreen, name/email would be missing.
+                }
+
+                editor.apply() // Apply all changes
+                Log.d("LoginViewModel", "SharedPreferences applied successfully.")
+
             }.onFailure {
                 Log.e("LoginViewModel", "Login failed: ${it.message}")
             }
 
-            _loginResult.emit(result) // Emit hasil asli ke UI
+            _loginResult.emit(result)
             _isLoading.value = false
         }
     }

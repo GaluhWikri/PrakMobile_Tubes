@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+// ... (other imports remain the same)
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -43,6 +44,9 @@ fun ArticleListScreen(
     onNavigateToCreate: () -> Unit,
     onNavigateToEdit: (String) -> Unit,
     onNavigateToLogin: () -> Unit,
+    onNavigateToProfile: () -> Unit,
+    onNavigateToChat: () -> Unit,
+    onNavigateToNotifications: () -> Unit,
     viewModel: ArticleListViewModel = hiltViewModel()
 ) {
     val articles by viewModel.articles.collectAsState()
@@ -64,7 +68,7 @@ fun ArticleListScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.refresh()
+        viewModel.refreshAllArticles() // Corrected: Was viewModel.refresh()
         viewModel.deleteResult.collectLatest { result ->
             if (result.isFailure) {
                 Toast.makeText(context, "Gagal menghapus artikel: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
@@ -85,20 +89,20 @@ fun ArticleListScreen(
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "Discover",
+                    "BOOOOOM BLOG",
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Text(
-                    "New articles",
+                    "Featured Submissions",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 CategoryChips(
-                    categories = listOf("Comedy", "Adventure", "Cosmos", "Winter Sports", "Nature", "Tech"),
-                    selectedCategory = "Cosmos",
+                    categories = listOf("Nature", "Photography", "Art", "Tech"),
+                    selectedCategory = "Art",
                     onCategorySelected = { /* TODO: Handle category selection */ }
                 )
             }
@@ -121,10 +125,13 @@ fun ArticleListScreen(
         bottomBar = {
             BottomNavigationBar(
                 height = bottomBarHeight,
-                onHomeClick = { /* TODO: Navigasi Home */ },
-                onChatClick = { /* TODO: Navigasi Chat */ },
-                onNotificationsClick = { /* TODO: Navigasi Notifikasi */ },
-                onProfileClick = { /* TODO: Navigasi Profile */ }, // Diubah dari onSettingsClick
+                selectedItemIndex = 0,
+                onHomeClick = {
+                    viewModel.refreshAllArticles() // Corrected: Was viewModel.refresh()
+                },
+                onChatClick = onNavigateToChat,
+                onNotificationsClick = onNavigateToNotifications,
+                onProfileClick = onNavigateToProfile,
                 onLogoutClick = { viewModel.performLogout() }
             )
         }
@@ -137,7 +144,7 @@ fun ArticleListScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 8.dp),
             contentPadding = PaddingValues(
-                top = 0.dp, // Atau 4.dp - 8.dp jika ingin sedikit jarak dari CategoryChips
+                top = 0.dp,
                 bottom = (fabSize / 2) + 8.dp
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -177,18 +184,18 @@ fun ArticleListScreen(
     }
 }
 
-
+// BottomNavigationBar, BottomNavItem, CategoryChips, Chip, DiscoverArticleCard composables remain unchanged from previous response.
+// Ensure BottomNavigationBar uses `selectedItemIndex` as a parameter.
 @Composable
 fun BottomNavigationBar(
     height: androidx.compose.ui.unit.Dp,
+    selectedItemIndex: Int, // Parameter to control selection
     onHomeClick: () -> Unit,
     onChatClick: () -> Unit,
     onNotificationsClick: () -> Unit,
-    onProfileClick: () -> Unit, // Diubah dari onSettingsClick menjadi onProfileClick
+    onProfileClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
-    var selectedItem by remember { mutableStateOf(0) }
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -204,37 +211,69 @@ fun BottomNavigationBar(
             BottomNavItem(
                 icon = Icons.Filled.Home,
                 label = "Home",
-                isSelected = selectedItem == 0,
-                onClick = { selectedItem = 0; onHomeClick() }
+                isSelected = selectedItemIndex == 0,
+                onClick = onHomeClick
             )
             BottomNavItem(
                 icon = Icons.Filled.ChatBubbleOutline,
                 label = "Chat",
-                isSelected = selectedItem == 1,
-                onClick = { selectedItem = 1; onChatClick() }
+                isSelected = selectedItemIndex == 1,
+                onClick = onChatClick
             )
 
-            Spacer(modifier = Modifier.width(64.dp)) // Ruang untuk FAB
+            Spacer(modifier = Modifier.width(64.dp)) // Space for FAB
 
             BottomNavItem(
                 icon = Icons.Filled.NotificationsNone,
                 label = "Notif",
-                isSelected = selectedItem == 2,
-                onClick = { selectedItem = 2; onNotificationsClick() }
+                isSelected = selectedItemIndex == 2,
+                onClick = onNotificationsClick
             )
-            // *** PERUBAHAN ICON DAN LABEL DI SINI ***
             BottomNavItem(
-                icon = Icons.Filled.Person, // Menggunakan ikon Person
-                label = "Profile",          // Label diubah menjadi Profile
-                isSelected = selectedItem == 3,
-                onClick = { selectedItem = 3; onProfileClick() } // Callback diubah menjadi onProfileClick
+                icon = Icons.Filled.Person,
+                label = "Profile",
+                isSelected = selectedItemIndex == 3,
+                onClick = onProfileClick
             )
         }
     }
 }
 
-// Composable CategoryChips, Chip, DiscoverArticleCard, dan BottomNavItem tetap sama
-// ...
+@Composable
+fun RowScope.BottomNavItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor,
+            modifier = Modifier.size(26.dp)
+        )
+        if (isSelected) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = contentColor,
+                fontSize = 10.sp
+            )
+        }
+    }
+}
+
 @Composable
 fun CategoryChips(
     categories: List<String>,
@@ -374,42 +413,6 @@ fun DiscoverArticleCard(
                     )
                 }
             }
-        }
-    }
-}
-
-
-@Composable
-fun RowScope.BottomNavItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = contentColor,
-            modifier = Modifier.size(26.dp)
-        )
-        if (isSelected) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = contentColor,
-                fontSize = 10.sp
-            )
         }
     }
 }

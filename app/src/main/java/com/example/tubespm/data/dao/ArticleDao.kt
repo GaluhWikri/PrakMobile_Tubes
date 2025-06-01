@@ -1,6 +1,5 @@
 package com.example.tubespm.data.dao
 
-// ArticleDao.kt
 import androidx.room.*
 import com.example.tubespm.data.model.Article
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +11,10 @@ interface ArticleDao {
 
     @Query("SELECT * FROM articles WHERE id = :id")
     suspend fun getArticleById(id: String): Article?
+
+    // New query to get articles by authorId
+    @Query("SELECT * FROM articles WHERE authorId = :authorId ORDER BY createdAt DESC")
+    fun getArticlesByAuthorId(authorId: String): Flow<List<Article>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertArticle(article: Article)
