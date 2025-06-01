@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.GridItemSpan // Import yang benar
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -80,6 +80,7 @@ fun ArticleListScreen(
         topBar = {
             Column(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface)
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -123,7 +124,7 @@ fun ArticleListScreen(
                 onHomeClick = { /* TODO: Navigasi Home */ },
                 onChatClick = { /* TODO: Navigasi Chat */ },
                 onNotificationsClick = { /* TODO: Navigasi Notifikasi */ },
-                onSettingsClick = { /* TODO: Navigasi Settings */ },
+                onProfileClick = { /* TODO: Navigasi Profile */ }, // Diubah dari onSettingsClick
                 onLogoutClick = { viewModel.performLogout() }
             )
         }
@@ -133,34 +134,28 @@ fun ArticleListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(paddingValues) // Menggunakan paddingValues dari Scaffold
+                .padding(paddingValues)
                 .padding(horizontal = 8.dp),
             contentPadding = PaddingValues(
-                top = 8.dp, // Jarak dari CategoryChips ke item grid pertama
+                top = 0.dp, // Atau 4.dp - 8.dp jika ingin sedikit jarak dari CategoryChips
                 bottom = (fabSize / 2) + 8.dp
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (isLoading && articles.isEmpty()) {
-                // *** PERBAIKAN DI SINI ***
-                item(span = { GridItemSpan(maxLineSpan) }) { // Menggunakan maxLineSpan dari scope
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp),
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
             } else if (articles.isEmpty() && !isLoading) {
-                // *** PERBAIKAN DI SINI ***
-                item(span = { GridItemSpan(maxLineSpan) }) { // Menggunakan maxLineSpan dari scope
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp),
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -182,8 +177,64 @@ fun ArticleListScreen(
     }
 }
 
-// Composable CategoryChips, Chip, DiscoverArticleCard, BottomNavigationBar, dan BottomNavItem tetap sama
-// ... (Kode untuk Composable lain tidak berubah dari respons sebelumnya)
+
+@Composable
+fun BottomNavigationBar(
+    height: androidx.compose.ui.unit.Dp,
+    onHomeClick: () -> Unit,
+    onChatClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
+    onProfileClick: () -> Unit, // Diubah dari onSettingsClick menjadi onProfileClick
+    onLogoutClick: () -> Unit
+) {
+    var selectedItem by remember { mutableStateOf(0) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height)
+            .shadow(elevation = 8.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomNavItem(
+                icon = Icons.Filled.Home,
+                label = "Home",
+                isSelected = selectedItem == 0,
+                onClick = { selectedItem = 0; onHomeClick() }
+            )
+            BottomNavItem(
+                icon = Icons.Filled.ChatBubbleOutline,
+                label = "Chat",
+                isSelected = selectedItem == 1,
+                onClick = { selectedItem = 1; onChatClick() }
+            )
+
+            Spacer(modifier = Modifier.width(64.dp)) // Ruang untuk FAB
+
+            BottomNavItem(
+                icon = Icons.Filled.NotificationsNone,
+                label = "Notif",
+                isSelected = selectedItem == 2,
+                onClick = { selectedItem = 2; onNotificationsClick() }
+            )
+            // *** PERUBAHAN ICON DAN LABEL DI SINI ***
+            BottomNavItem(
+                icon = Icons.Filled.Person, // Menggunakan ikon Person
+                label = "Profile",          // Label diubah menjadi Profile
+                isSelected = selectedItem == 3,
+                onClick = { selectedItem = 3; onProfileClick() } // Callback diubah menjadi onProfileClick
+            )
+        }
+    }
+}
+
+// Composable CategoryChips, Chip, DiscoverArticleCard, dan BottomNavItem tetap sama
+// ...
 @Composable
 fun CategoryChips(
     categories: List<String>,
@@ -327,59 +378,6 @@ fun DiscoverArticleCard(
     }
 }
 
-@Composable
-fun BottomNavigationBar(
-    height: androidx.compose.ui.unit.Dp,
-    onHomeClick: () -> Unit,
-    onChatClick: () -> Unit,
-    onNotificationsClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-    onLogoutClick: () -> Unit
-) {
-    var selectedItem by remember { mutableStateOf(0) }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(height)
-            .shadow(elevation = 8.dp),
-        color = MaterialTheme.colorScheme.surface
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BottomNavItem(
-                icon = Icons.Filled.Home,
-                label = "Home",
-                isSelected = selectedItem == 0,
-                onClick = { selectedItem = 0; onHomeClick() }
-            )
-            BottomNavItem(
-                icon = Icons.Filled.ChatBubbleOutline,
-                label = "Chat",
-                isSelected = selectedItem == 1,
-                onClick = { selectedItem = 1; onChatClick() }
-            )
-
-            Spacer(modifier = Modifier.width(64.dp))
-
-            BottomNavItem(
-                icon = Icons.Filled.NotificationsNone,
-                label = "Notif",
-                isSelected = selectedItem == 2,
-                onClick = { selectedItem = 2; onNotificationsClick() }
-            )
-            BottomNavItem(
-                icon = Icons.Filled.Tune,
-                label = "Settings",
-                isSelected = selectedItem == 3,
-                onClick = { selectedItem = 3; onSettingsClick() }
-            )
-        }
-    }
-}
 
 @Composable
 fun RowScope.BottomNavItem(
