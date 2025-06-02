@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Search // Import Search icon
 import androidx.compose.material.icons.outlined.SentimentDissatisfied
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,13 +55,15 @@ import java.util.*
 fun ArticleListScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToCreate: () -> Unit,
-    onNavigateToEdit: (String) -> Unit,
+    onNavigateToEdit: (String) -> Unit, // This parameter seems unused here, consider if needed
     onNavigateToLogin: () -> Unit,
     onNavigateToProfile: () -> Unit,
     viewModel: ArticleListViewModel = hiltViewModel()
 ) {
-    val articles by viewModel.articles.collectAsState()
+    // Use searchedArticles for display
+    val articles by viewModel.searchedArticles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
     val context = LocalContext.current
 
     var showLogoutDialogFromHome by remember { mutableStateOf(false) }
@@ -79,14 +82,15 @@ fun ArticleListScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.refreshAllArticles()
-        viewModel.deleteResult.collectLatest { result ->
-            if (result.isFailure) {
-                Toast.makeText(context, "Gagal menghapus artikel: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-            }
+    // Initial data load if articles are empty and not loading, and search is not active
+    LaunchedEffect(articles, isLoading, searchQuery) {
+        if (articles.isEmpty() && !isLoading && searchQuery.isBlank()) {
+            viewModel.refreshAllArticles()
         }
+        // If deleteResult is needed here, it should be collected
+        // viewModel.deleteResult.collectLatest { result -> ... }
     }
+
 
     val bottomBarHeight = 72.dp
     val fabSize = 64.dp
@@ -97,7 +101,7 @@ fun ArticleListScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.surface) // Changed to surface for consistency
                     .padding(top = 8.dp)
             ) {
                 Text(
@@ -112,11 +116,37 @@ fun ArticleListScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.onSearchQueryChanged(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = { Text("Search articles by title or content...") },
+                    leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search Icon") },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                                Icon(Icons.Filled.Clear, contentDescription = "Clear Search")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp), // Consistent rounding
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    )
+                )
+                // CategoryChips are not directly integrated with search in this implementation
+                // but remain for visual structure.
                 CategoryChips(
-                    categories = listOf("All", "Nature", "Photography", "Art", "Tech"),
-                    selectedCategory = "All",
-                    onCategorySelected = { /* TODO: Handle category selection */ }
+                    categories = listOf("All", "Nature", "Photography", "Art", "Tech"), // Example categories
+                    selectedCategory = "All", // This would need its own state and logic if functional
+                    onCategorySelected = { /* TODO: Handle category selection, potentially combine with search */ }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -141,6 +171,7 @@ fun ArticleListScreen(
                 height = bottomBarHeight,
                 selectedItemIndex = 0, // Home
                 onHomeClick = {
+                    viewModel.onSearchQueryChanged("") // Clear search on home click
                     viewModel.refreshAllArticles()
                 },
                 onProfileClick = onNavigateToProfile,
@@ -162,7 +193,7 @@ fun ArticleListScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (isLoading && articles.isEmpty()) {
+            if (isLoading && articles.isEmpty() && searchQuery.isBlank()) { // Show loading only if not searching
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(
                         modifier = Modifier.fillMaxWidth().height(300.dp).padding(top=50.dp),
@@ -171,7 +202,7 @@ fun ArticleListScreen(
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
-            } else if (articles.isEmpty() && !isLoading) {
+            } else if (articles.isEmpty()) { // This now covers "no articles found" for search too
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(
                         modifier = Modifier.fillMaxWidth().height(300.dp).padding(top=50.dp),
@@ -181,9 +212,10 @@ fun ArticleListScreen(
                             Icon(Icons.Outlined.SentimentDissatisfied, contentDescription = "No articles", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "Belum ada artikel",
+                                text = if (searchQuery.isNotBlank()) "No articles found for '$searchQuery'" else "Belum ada artikel",
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp)
                             )
                         }
                     }
@@ -222,14 +254,17 @@ fun ArticleListScreen(
     }
 }
 
-// BottomNavigationBar dan BottomNavItem (jika belum dipindah ke file terpisah)
+// BottomNavigationBar, BottomNavItem, CategoryChips, Chip, DiscoverArticleCard composables remain the same
+// Make sure they are either in this file or imported correctly.
+// I'll include them here for completeness, assuming they were part of the original ArticleListScreen.kt
+
 @Composable
 fun BottomNavigationBar(
     height: androidx.compose.ui.unit.Dp,
     selectedItemIndex: Int,
     onHomeClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onLogoutClick: () -> Unit // Parameter ini bisa digunakan jika ada tombol logout global di BottomNav
+    onLogoutClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -250,7 +285,7 @@ fun BottomNavigationBar(
                 onClick = onHomeClick
             )
 
-            Spacer(modifier = Modifier.width(80.dp)) // Spacer untuk FAB
+            Spacer(modifier = Modifier.width(80.dp)) // Spacer for FAB
 
             BottomNavItem(
                 icon = if (selectedItemIndex == 1) Icons.Filled.Person else Icons.Outlined.Person,
@@ -297,14 +332,14 @@ fun RowScope.BottomNavItem(
             enter = fadeIn(animationSpec = tween(100, delayMillis = 50)) + slideInVertically(initialOffsetY = {it/2}, animationSpec = tween(200, delayMillis = 50)),
             exit = fadeOut(animationSpec = tween(100))
         ) {
-            Column {
+            Column { // Wrap Text in a Column or Box if needed for spacing/alignment
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = contentColor,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium
+                    fontSize = 10.sp, // Explicitly set for smaller text
+                    fontWeight = FontWeight.Medium // Or FontWeight.Normal
                 )
             }
         }
@@ -350,9 +385,9 @@ fun Chip(label: String, isSelected: Boolean, onClick: () -> Unit) {
         animationSpec = tween(durationMillis = 300), label = "chipBorderColorFull"
     )
 
-    Surface(
+    Surface( // Changed from FilterChip to Surface for custom styling
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(50)) // Fully rounded corners
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(50),
         color = backgroundColor,
@@ -375,23 +410,24 @@ fun DiscoverArticleCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.75f)
+            .aspectRatio(0.75f) // Aspect ratio for the card
             .shadow(
-                elevation = 6.dp,
+                elevation = 6.dp, // Consistent shadow
                 shape = RoundedCornerShape(16.dp),
                 spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
             )
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(16.dp), // Consistent rounding
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest // Match theme
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Shadow handled by modifier
     ) {
         Column {
+            // Image Box
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(1f) // Image takes most space
                     .fillMaxWidth()
             ) {
                 if (article.imageUrl != null && article.imageUrl.isNotBlank()) {
@@ -400,10 +436,11 @@ fun DiscoverArticleCard(
                         contentDescription = article.title,
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)), // Clip image to top corners
                         contentScale = ContentScale.Crop
                     )
                 } else {
+                    // Placeholder for no image
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -419,7 +456,7 @@ fun DiscoverArticleCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Filled.ImageNotSupported,
+                            Icons.Filled.ImageNotSupported, // Placeholder icon
                             contentDescription = "No image available",
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
@@ -428,21 +465,22 @@ fun DiscoverArticleCard(
                 }
             }
 
+            // Text content area
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest) // Ensure consistent background
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 Text(
                     text = article.title,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        lineHeight = 20.sp
+                        lineHeight = 20.sp // Adjust line height if needed
                     ),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface // Ensure text color contrasts with background
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
@@ -453,10 +491,10 @@ fun DiscoverArticleCard(
                         Icons.Outlined.CalendarToday,
                         contentDescription = "Tanggal",
                         modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant // Use a less prominent color
                     )
                     Text(
-                        text = try {
+                        text = try { // Safely format date
                             SimpleDateFormat("dd MMM, yy", Locale.getDefault()).format(article.createdAt)
                         } catch (e: Exception) {
                             "Invalid date"

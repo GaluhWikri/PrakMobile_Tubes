@@ -14,30 +14,53 @@ import javax.inject.Inject
 @HiltViewModel
 class ArticleListViewModel @Inject constructor(
     private val repository: BlogRepository,
-    private val sharedPreferences: SharedPreferences // Tetap inject jika diperlukan untuk hal lain atau preferensi ViewModel
+    private val sharedPreferences: SharedPreferences
 ) : ViewModel() {
 
-    // ... (isLoading, deleteResult, articles, logoutEvent tetap sama) ...
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _deleteResult = MutableSharedFlow<Result<Unit>>()
     val deleteResult: SharedFlow<Result<Unit>> = _deleteResult.asSharedFlow()
 
-    val articles: StateFlow<List<Article>> = repository.getAllArticles()
-        .catch { e -> Log.e("ArticleListVM", "Error collecting all articles", e); emit(emptyList()) }
+    // Original flow of all articles from the repository
+    private val _allArticles: StateFlow<List<Article>> = repository.getAllArticles()
+        .catch { e ->
+            Log.e("ArticleListVM", "Error collecting all articles", e)
+            emit(emptyList())
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000L),
             initialValue = emptyList()
         )
 
+    // StateFlow for the search query
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    // Untuk artikel pengguna di ProfileScreen
+    // StateFlow for articles filtered by the search query
+    val searchedArticles: StateFlow<List<Article>> = _searchQuery
+        .debounce(300L) // Debounce to avoid too frequent filtering
+        .combine(_allArticles) { query, articlesList ->
+            if (query.isBlank()) {
+                articlesList
+            } else {
+                articlesList.filter { article ->
+                    article.title.contains(query, ignoreCase = true) ||
+                            article.content.contains(query, ignoreCase = true) // Optionally search in content
+                }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = emptyList() // Or _allArticles.value if appropriate and safe
+        )
+
     private val _currentUserArticles = MutableStateFlow<List<Article>>(emptyList())
     val currentUserArticles: StateFlow<List<Article>> = _currentUserArticles.asStateFlow()
 
-    // Untuk data pengguna di ProfileScreen
     private val _currentUserId = MutableStateFlow<String?>(null)
     val currentUserId: StateFlow<String?> = _currentUserId.asStateFlow()
 
@@ -57,16 +80,19 @@ class ArticleListViewModel @Inject constructor(
 
     init {
         Log.d("ArticleListVM", "ViewModel initializing...")
-        refreshAllArticles()
-        loadUserProfileDataAndArticles() // Menggabungkan pemuatan data profil dan artikel pengguna
+        refreshAllArticles() // This will populate _allArticles
+        loadUserProfileDataAndArticles()
         Log.d("ArticleListVM", "ViewModel initialization complete.")
+    }
+
+    fun onSearchQueryChanged(query: String) {
+        _searchQuery.value = query
     }
 
     private fun loadUserProfileDataAndArticles() {
         viewModelScope.launch {
             try {
                 Log.d("ArticleListVM", "Attempting to load current user profile and articles.")
-                // Ambil data pengguna dari repository (yang mengambil dari SharedPreferences)
                 _currentUserName.value = repository.getCurrentUserName()
                 _currentUserEmail.value = repository.getCurrentUserEmail()
                 val userId = repository.getCurrentUserId()
@@ -97,7 +123,6 @@ class ArticleListViewModel @Inject constructor(
         }
     }
 
-
     fun refreshAllArticles() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -107,7 +132,6 @@ class ArticleListViewModel @Inject constructor(
                 Log.d("ArticleListVM", "Sync articles successful.")
             } catch (e: Exception) {
                 Log.e("ArticleListVM", "Failed to sync articles", e)
-                // _logoutEvent.emit(LogoutEvent.Error("Gagal memuat artikel: ${e.message}")) // Mungkin tidak perlu emit logout di sini
             } finally {
                 _isLoading.value = false
                 Log.d("ArticleListVM", "Refresh all articles finished.")
@@ -117,17 +141,15 @@ class ArticleListViewModel @Inject constructor(
 
     fun refreshCurrentUserArticles() {
         Log.d("ArticleListVM", "Refreshing current user profile and articles...")
-        loadUserProfileDataAndArticles() // Panggil fungsi yang sudah ada
+        loadUserProfileDataAndArticles()
     }
-
 
     fun deleteArticle(article: Article) {
         viewModelScope.launch {
-            _isLoading.value = true // Indicate loading during delete
+            _isLoading.value = true
             val result = repository.deleteArticle(article)
             _deleteResult.emit(result)
             if (result.isSuccess) {
-                // Flows should update automatically if DAO changes are observed
                 Log.d("ArticleListVM", "Article ${article.id} deleted, flows should update.")
             } else {
                 Log.e("ArticleListVM", "Failed to delete article: ${result.exceptionOrNull()?.message}")
@@ -140,10 +162,9 @@ class ArticleListViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             Log.d("ArticleListVM", "Performing logout...")
-            val result = repository.logoutUser() // This now clears user_name and user_email too
+            val result = repository.logoutUser()
             if (result.isSuccess) {
                 _logoutEvent.emit(LogoutEvent.Success)
-                // Clear ViewModel states related to user
                 _currentUserId.value = null
                 _currentUserName.value = null
                 _currentUserEmail.value = null
