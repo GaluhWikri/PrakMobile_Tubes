@@ -30,8 +30,8 @@ import kotlinx.coroutines.flow.collectLatest
 @Composable
 fun LoginScreen(
     loginViewModel: LoginViewModel = hiltViewModel(),
-    onLoginSuccess: () -> Unit, // Callback untuk navigasi setelah login berhasil
-    onNavigateToRegister: () -> Unit // Callback untuk navigasi ke halaman register
+    onLoginSuccess: () -> Unit,
+    onNavigateToRegister: () -> Unit
 ) {
     val email by loginViewModel.email.collectAsState()
     val password by loginViewModel.password.collectAsState()
@@ -40,21 +40,35 @@ fun LoginScreen(
 
     var passwordVisible by remember { mutableStateOf(false) }
 
+    var showLoginErrorDialog by remember { mutableStateOf(false) }
+    var loginErrorMessage by remember { mutableStateOf("") }
+
     LaunchedEffect(key1 = Unit) {
         loginViewModel.loginResult.collectLatest { result ->
             result.fold(
                 onSuccess = { authResponse ->
-                    // TODO: Simpan token (authResponse.accessToken) dan data user (authResponse.user)
-                    // Misalnya menggunakan SharedPreferences atau DataStore.
-                    // Contoh sederhana: Tampilkan pesan sukses
                     Toast.makeText(context, authResponse.message ?: "Login Berhasil!", Toast.LENGTH_LONG).show()
-                    onLoginSuccess() // Panggil callback untuk navigasi
+                    onLoginSuccess()
                 },
                 onFailure = { error ->
-                    Toast.makeText(context, "Login Gagal: ${error.message}", Toast.LENGTH_LONG).show()
+                    loginErrorMessage = error.message ?: "Terjadi kesalahan yang tidak diketahui."
+                    showLoginErrorDialog = true
                 }
             )
         }
+    }
+
+    if (showLoginErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showLoginErrorDialog = false },
+            title = { Text("Login Gagal") },
+            text = { Text(loginErrorMessage) },
+            confirmButton = {
+                TextButton(onClick = { showLoginErrorDialog = false }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     Box(
@@ -100,7 +114,8 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                isError = showLoginErrorDialog
             )
 
             OutlinedTextField(
@@ -119,7 +134,8 @@ fun LoginScreen(
                         Icon(imageVector = image, description)
                     }
                 },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                isError = showLoginErrorDialog
             )
 
             Button(

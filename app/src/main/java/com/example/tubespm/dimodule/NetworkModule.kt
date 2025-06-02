@@ -3,6 +3,8 @@ package com.example.tubespm.dimodule
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.tubespm.network.ApiService
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,15 +34,11 @@ object NetworkModule {
             val token = sharedPreferences.getString("auth_token", null)
             val originalRequest = chain.request()
             val requestBuilder = originalRequest.newBuilder()
-                .header("Accept", "application/json") // Selalu tambahkan Accept: application/json
+                .header("Accept", "application/json")
 
             token?.let {
                 requestBuilder.header("Authorization", "Bearer $it")
             }
-            // Tambahkan Content-Type jika request memiliki body (POST, PUT)
-            // OkHttp akan menanganinya jika body ada dan tipenya diset dengan benar oleh Retrofit/Gson
-            // Namun, pastikan API Anda tidak rewel soal ini jika body kosong untuk GET/DELETE
-
             chain.proceed(requestBuilder.build())
         }
     }
@@ -58,11 +56,17 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
+    fun provideGson(): Gson { // Provider untuk Gson
+        return GsonBuilder().create()
+    }
+
+    @Provides
+    @Singleton
+    fun provideRetrofit(okHttpClient: OkHttpClient, gson: Gson): Retrofit { // Inject Gson di sini
         return Retrofit.Builder()
-            .baseUrl("http://10.0.2.2:8000/api/")
+            .baseUrl("http://10.0.2.2:8000/api/") // Pastikan URL API Anda benar
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson)) // Gunakan instance Gson
             .build()
     }
 

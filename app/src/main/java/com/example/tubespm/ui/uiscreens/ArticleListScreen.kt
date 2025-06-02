@@ -1,10 +1,17 @@
 package com.example.tubespm.ui.uiscreens
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-// ... (other imports remain the same)
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -14,6 +21,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.SentimentDissatisfied
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -45,13 +57,13 @@ fun ArticleListScreen(
     onNavigateToEdit: (String) -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToChat: () -> Unit,
-    onNavigateToNotifications: () -> Unit,
     viewModel: ArticleListViewModel = hiltViewModel()
 ) {
     val articles by viewModel.articles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val context = LocalContext.current
+
+    var showLogoutDialogFromHome by remember { mutableStateOf(false) }
 
     LaunchedEffect(key1 = Unit) {
         viewModel.logoutEvent.collectLatest { event ->
@@ -68,7 +80,7 @@ fun ArticleListScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.refreshAllArticles() // Corrected: Was viewModel.refresh()
+        viewModel.refreshAllArticles()
         viewModel.deleteResult.collectLatest { result ->
             if (result.isFailure) {
                 Toast.makeText(context, "Gagal menghapus artikel: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
@@ -86,12 +98,13 @@ fun ArticleListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface)
+                    .padding(top = 8.dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     "BOOOOOM BLOG",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     "Featured Submissions",
@@ -99,12 +112,13 @@ fun ArticleListScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 CategoryChips(
-                    categories = listOf("Nature", "Photography", "Art", "Tech"),
-                    selectedCategory = "Art",
+                    categories = listOf("All", "Nature", "Photography", "Art", "Tech"),
+                    selectedCategory = "All",
                     onCategorySelected = { /* TODO: Handle category selection */ }
                 )
+                Spacer(modifier = Modifier.height(8.dp))
             }
         },
         floatingActionButton = {
@@ -125,14 +139,12 @@ fun ArticleListScreen(
         bottomBar = {
             BottomNavigationBar(
                 height = bottomBarHeight,
-                selectedItemIndex = 0,
+                selectedItemIndex = 0, // Home
                 onHomeClick = {
-                    viewModel.refreshAllArticles() // Corrected: Was viewModel.refresh()
+                    viewModel.refreshAllArticles()
                 },
-                onChatClick = onNavigateToChat,
-                onNotificationsClick = onNavigateToNotifications,
                 onProfileClick = onNavigateToProfile,
-                onLogoutClick = { viewModel.performLogout() }
+                onLogoutClick = { showLogoutDialogFromHome = true }
             )
         }
     ) { paddingValues ->
@@ -142,18 +154,18 @@ fun ArticleListScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(paddingValues)
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 12.dp),
             contentPadding = PaddingValues(
-                top = 0.dp,
-                bottom = (fabSize / 2) + 8.dp
+                top = 8.dp,
+                bottom = (fabSize / 2) + bottomBarHeight + 8.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (isLoading && articles.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        modifier = Modifier.fillMaxWidth().height(300.dp).padding(top=50.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -162,14 +174,18 @@ fun ArticleListScreen(
             } else if (articles.isEmpty() && !isLoading) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        modifier = Modifier.fillMaxWidth().height(300.dp).padding(top=50.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "Belum ada artikel",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Outlined.SentimentDissatisfied, contentDescription = "No articles", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Belum ada artikel",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             } else {
@@ -182,26 +198,45 @@ fun ArticleListScreen(
             }
         }
     }
+    if (showLogoutDialogFromHome) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialogFromHome = false },
+            title = { Text("Konfirmasi Logout") },
+            text = { Text("Apakah Anda yakin ingin logout?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.performLogout()
+                        showLogoutDialogFromHome = false
+                    }
+                ) {
+                    Text("Ya", color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialogFromHome = false }) {
+                    Text("Tidak")
+                }
+            }
+        )
+    }
 }
 
-// BottomNavigationBar, BottomNavItem, CategoryChips, Chip, DiscoverArticleCard composables remain unchanged from previous response.
-// Ensure BottomNavigationBar uses `selectedItemIndex` as a parameter.
+// BottomNavigationBar dan BottomNavItem (jika belum dipindah ke file terpisah)
 @Composable
 fun BottomNavigationBar(
     height: androidx.compose.ui.unit.Dp,
-    selectedItemIndex: Int, // Parameter to control selection
+    selectedItemIndex: Int,
     onHomeClick: () -> Unit,
-    onChatClick: () -> Unit,
-    onNotificationsClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit // Parameter ini bisa digunakan jika ada tombol logout global di BottomNav
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .height(height)
-            .shadow(elevation = 8.dp),
-        color = MaterialTheme.colorScheme.surface
+            .shadow(elevation = 8.dp, spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -209,30 +244,18 @@ fun BottomNavigationBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             BottomNavItem(
-                icon = Icons.Filled.Home,
+                icon = if (selectedItemIndex == 0) Icons.Filled.Home else Icons.Outlined.Home,
                 label = "Home",
                 isSelected = selectedItemIndex == 0,
                 onClick = onHomeClick
             )
-            BottomNavItem(
-                icon = Icons.Filled.ChatBubbleOutline,
-                label = "Chat",
-                isSelected = selectedItemIndex == 1,
-                onClick = onChatClick
-            )
 
-            Spacer(modifier = Modifier.width(64.dp)) // Space for FAB
+            Spacer(modifier = Modifier.width(80.dp)) // Spacer untuk FAB
 
             BottomNavItem(
-                icon = Icons.Filled.NotificationsNone,
-                label = "Notif",
-                isSelected = selectedItemIndex == 2,
-                onClick = onNotificationsClick
-            )
-            BottomNavItem(
-                icon = Icons.Filled.Person,
+                icon = if (selectedItemIndex == 1) Icons.Filled.Person else Icons.Outlined.Person,
                 label = "Profile",
-                isSelected = selectedItemIndex == 3,
+                isSelected = selectedItemIndex == 1,
                 onClick = onProfileClick
             )
         }
@@ -247,12 +270,19 @@ fun RowScope.BottomNavItem(
     onClick: () -> Unit
 ) {
     val contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    val animatedScale by animateFloatAsState(targetValue = if (isSelected) 1.1f else 1.0f, label = "scaleAnimNavItemFull", animationSpec = tween(durationMillis = 200))
+    val animatedAlpha by animateFloatAsState(targetValue = if (isSelected) 1f else 0.7f, label = "alphaAnimNavItemFull", animationSpec = tween(durationMillis = 200))
 
     Column(
         modifier = Modifier
             .weight(1f)
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(vertical = 8.dp)
+            .graphicsLayer(scaleX = animatedScale, scaleY = animatedScale, alpha = animatedAlpha),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -260,19 +290,27 @@ fun RowScope.BottomNavItem(
             imageVector = icon,
             contentDescription = label,
             tint = contentColor,
-            modifier = Modifier.size(26.dp)
+            modifier = Modifier.size(if (isSelected) 28.dp else 26.dp)
         )
-        if (isSelected) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = contentColor,
-                fontSize = 10.sp
-            )
+        AnimatedVisibility(
+            visible = isSelected,
+            enter = fadeIn(animationSpec = tween(100, delayMillis = 50)) + slideInVertically(initialOffsetY = {it/2}, animationSpec = tween(200, delayMillis = 50)),
+            exit = fadeOut(animationSpec = tween(100))
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contentColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
+
 
 @Composable
 fun CategoryChips(
@@ -299,18 +337,27 @@ fun CategoryChips(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Chip(label: String, isSelected: Boolean, onClick: () -> Unit) {
-    val backgroundAlpha = if (isSelected) 1f else 0.1f
-    val contentAlpha = if (isSelected) 1f else 0.7f
-    val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        animationSpec = tween(durationMillis = 300), label = "chipBgColorFull"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        animationSpec = tween(durationMillis = 300), label = "chipTextColorFull"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+        animationSpec = tween(durationMillis = 300), label = "chipBorderColorFull"
+    )
 
     Surface(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(50),
-        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = backgroundAlpha),
-        border = if (!isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) else null,
-        contentColor = textColor.copy(alpha = contentAlpha)
+        color = backgroundColor,
+        border = BorderStroke(1.dp, borderColor),
+        contentColor = textColor
     ) {
         Text(
             text = label,
@@ -330,14 +377,16 @@ fun DiscoverArticleCard(
             .fillMaxWidth()
             .aspectRatio(0.75f)
             .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(12.dp)
+                elevation = 6.dp,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
             )
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
             Box(
@@ -351,29 +400,29 @@ fun DiscoverArticleCard(
                         contentDescription = article.title,
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
                         contentScale = ContentScale.Crop
                     )
                 } else {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                             .background(
-                                Brush.horizontalGradient(
+                                Brush.verticalGradient(
                                     colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                                     )
                                 )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Filled.BrokenImage,
-                            contentDescription = "No image",
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            Icons.Filled.ImageNotSupported,
+                            contentDescription = "No image available",
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -382,32 +431,36 @@ fun DiscoverArticleCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 Text(
                     text = article.title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, lineHeight = 18.sp),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 20.sp
+                    ),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = SimpleDateFormat("dd MMM, yy", Locale.getDefault()).format(article.createdAt),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Icon(
+                        Icons.Outlined.CalendarToday,
+                        contentDescription = "Tanggal",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "•",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "5 min read",
+                        text = try {
+                            SimpleDateFormat("dd MMM, yy", Locale.getDefault()).format(article.createdAt)
+                        } catch (e: Exception) {
+                            "Invalid date"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

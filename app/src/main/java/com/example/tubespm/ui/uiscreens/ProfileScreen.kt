@@ -1,15 +1,27 @@
 package com.example.tubespm.ui.uiscreens
 
+import android.util.Log
 import android.widget.Toast
+// Import untuk animasi dan komponen UI lainnya tetap ada
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape // Needed for FAB shape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,13 +29,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex // Needed for FAB zIndex
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.tubespm.data.model.Article
@@ -31,18 +45,11 @@ import com.example.tubespm.ui.viewmodels.ArticleListViewModel
 import kotlinx.coroutines.flow.collectLatest
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Refresh
-import kotlinx.coroutines.flow.collectLatest
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     onNavigateToHome: () -> Unit,
-    onNavigateToChat: () -> Unit,
-    onNavigateToNotifications: () -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToEdit: (String) -> Unit,
@@ -53,15 +60,23 @@ fun ProfileScreen(
     val userArticles by viewModel.currentUserArticles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
-    // Ambil nama dan email pengguna dari ViewModel
+    val currentUserId by viewModel.currentUserId.collectAsState()
     val userName by viewModel.currentUserName.collectAsState()
     val userEmail by viewModel.currentUserEmail.collectAsState()
 
-    var showDeleteDialog by remember { mutableStateOf<Article?>(null) }
+    var showDeleteArticleDialog by remember { mutableStateOf<Article?>(null) }
+    var showLogoutConfirmationDialog by remember { mutableStateOf(false) }
+    var isLoggedOut by remember { mutableStateOf(currentUserId == null) }
 
     LaunchedEffect(Unit) {
-        viewModel.refreshCurrentUserArticles() // Ini akan memuat data profil dan artikel pengguna
-        // ... (collector lainnya tetap sama) ...
+        if (viewModel.currentUserId.value == null && !isLoggedOut) {
+            Log.d("ProfileScreen", "Initial check: User ID is null, marking as logged out.")
+            isLoggedOut = true
+        }
+        if (currentUserId != null) { // Hanya refresh jika user login
+            viewModel.refreshCurrentUserArticles()
+        }
+
         viewModel.deleteResult.collectLatest { result ->
             if (result.isFailure) {
                 Toast.makeText(context, "Gagal menghapus artikel: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
@@ -69,18 +84,29 @@ fun ProfileScreen(
                 Toast.makeText(context, "Artikel berhasil dihapus", Toast.LENGTH_SHORT).show()
             }
         }
+
         viewModel.logoutEvent.collectLatest { event ->
             when (event) {
                 is ArticleListViewModel.LogoutEvent.Success -> {
                     Toast.makeText(context, "Logout Berhasil", Toast.LENGTH_SHORT).show()
-                    onNavigateToLogin()
+                    if (!isLoggedOut) isLoggedOut = true
                 }
                 is ArticleListViewModel.LogoutEvent.Error -> {
                     Toast.makeText(context, event.message ?: "Logout Gagal", Toast.LENGTH_LONG).show()
+                    if (isLoggedOut) isLoggedOut = false
                 }
             }
         }
     }
+
+    LaunchedEffect(currentUserId) {
+        Log.d("ProfileScreen", "currentUserId changed to: $currentUserId, current isLoggedOut: $isLoggedOut")
+        if (currentUserId == null && !isLoggedOut) {
+            isLoggedOut = true
+            Log.d("ProfileScreen", "currentUserId became null, marked as logged out.")
+        }
+    }
+
 
     val bottomBarHeight = 72.dp
     val fabSize = 64.dp
@@ -89,7 +115,7 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profil Saya", fontWeight = FontWeight.Bold) }, // Judul diubah
+                title = { Text(if (isLoggedOut) "Anda Telah Logout" else "Profil Saya", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
@@ -97,128 +123,215 @@ fun ProfileScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 actions = {
-                    IconButton(onClick = { viewModel.performLogout() }) {
-                        Icon(Icons.Filled.Logout, "Logout", tint = MaterialTheme.colorScheme.onPrimary)
-                    }
-                    IconButton(onClick = {
-                        viewModel.refreshCurrentUserArticles() // Refresh data profil & artikel
-                    }) {
-                        Icon(Icons.Filled.Refresh, "Refresh Data", tint = MaterialTheme.colorScheme.onPrimary)
+                    if (!isLoggedOut) {
+                        IconButton(onClick = { showLogoutConfirmationDialog = true }) {
+                            Icon(Icons.Filled.Logout, "Logout", tint = MaterialTheme.colorScheme.onPrimary)
+                        }
+                        IconButton(onClick = {
+                            if (currentUserId != null) viewModel.refreshCurrentUserArticles()
+                        }) {
+                            Icon(Icons.Filled.Refresh, "Refresh Data", tint = MaterialTheme.colorScheme.onPrimary)
+                        }
                     }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToCreate,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape,
-                modifier = Modifier
-                    .size(fabSize)
-                    .offset(y = fabOffset)
-                    .zIndex(1f)
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "Buat Artikel Baru", modifier = Modifier.size(32.dp))
+            if (!isLoggedOut) {
+                FloatingActionButton(
+                    onClick = onNavigateToCreate,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .size(fabSize)
+                        .offset(y = fabOffset)
+                        .zIndex(1f)
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Buat Artikel Baru", modifier = Modifier.size(32.dp))
+                }
             }
         },
         floatingActionButtonPosition = FabPosition.Center,
         bottomBar = {
-            BottomNavigationBar(
-                height = bottomBarHeight,
-                selectedItemIndex = 3,
-                onHomeClick = onNavigateToHome,
-                onChatClick = onNavigateToChat,
-                onNotificationsClick = onNavigateToNotifications,
-                onProfileClick = { /* Already on Profile */ },
-                onLogoutClick = { viewModel.performLogout() }
-            )
-        }
-    ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = RoundedCornerShape(12.dp))
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.AccountCircle,
-                        contentDescription = "Profile Icon",
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = userName ?: "Nama Pengguna", // Tampilkan nama pengguna
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = userEmail ?: "email@example.com", // Tampilkan email pengguna
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            if (!isLoggedOut) {
+                // Memanggil BottomNavigationBar yang didefinisikan di ArticleListScreen.kt
+                // atau file komponen bersama lainnya dalam package yang sama.
+                BottomNavigationBar(
+                    height = bottomBarHeight,
+                    selectedItemIndex = 1, // Profile (0: Home, 1: Profile)
+                    onHomeClick = onNavigateToHome,
+                    onProfileClick = { /* Already on Profile */ },
+                    onLogoutClick = { showLogoutConfirmationDialog = true }
+                )
+            } else {
+                Surface(modifier = Modifier.fillMaxWidth().height(bottomBarHeight), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center){
+                        Button(onClick = onNavigateToLogin, shape = RoundedCornerShape(12.dp)) {
+                            Icon(Icons.Filled.Login, contentDescription = "Login")
+                            Spacer(Modifier.width(8.dp))
+                            Text("Login untuk Melanjutkan")
+                        }
+                    }
                 }
             }
-
-            // Tampilkan daftar artikel pengguna
-            if (isLoading && userArticles.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (userArticles.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        "Anda belum membuat artikel.",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = if(isLoggedOut) Arrangement.Center else Arrangement.Top
+        ) {
+            if (isLoggedOut) {
+                Spacer(modifier = Modifier.height(32.dp))
+                Icon(
+                    imageVector = Icons.Filled.NotInterested,
+                    contentDescription = "Logged Out",
+                    modifier = Modifier.size(100.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Anda telah berhasil logout.",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Silakan login kembali untuk melanjutkan.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onNavigateToLogin,
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Filled.Login, contentDescription = "Login kembali")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("LOGIN KEMBALI", fontWeight = FontWeight.Bold)
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = bottomBarHeight + fabSize / 2 + 8.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(userArticles, key = { it.id }) { article ->
-                        UserArticleCard(
-                            article = article,
-                            onCardClick = { onNavigateToDetail(article.id) },
-                            onEditClick = { onNavigateToEdit(article.id) },
-                            onDeleteClick = { showDeleteDialog = article }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(12.dp)
                         )
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Filled.AccountCircle,
+                            contentDescription = "Profile Icon",
+                            modifier = Modifier.size(80.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = userName ?: "Memuat nama...",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = userEmail ?: "Memuat email...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (isLoading && userArticles.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (userArticles.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(16.dp), contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Anda belum membuat artikel.",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 8.dp,
+                            bottom = if (!isLoggedOut) bottomBarHeight + fabSize / 2 + 8.dp else 8.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(userArticles, key = { it.id }) { article ->
+                            UserArticleCard(
+                                article = article,
+                                onCardClick = { onNavigateToDetail(article.id) },
+                                onEditClick = { onNavigateToEdit(article.id) },
+                                onDeleteClick = { showDeleteArticleDialog = article }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    showDeleteDialog?.let { articleToDelete ->
+    if (showLogoutConfirmationDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = null },
+            onDismissRequest = { showLogoutConfirmationDialog = false },
+            title = { Text("Konfirmasi Logout") },
+            text = { Text("Apakah Anda yakin ingin logout?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.performLogout()
+                        showLogoutConfirmationDialog = false
+                    }
+                ) {
+                    Text("Ya", color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirmationDialog = false }) {
+                    Text("Tidak")
+                }
+            }
+        )
+    }
+
+    showDeleteArticleDialog?.let { articleToDelete ->
+        AlertDialog(
+            onDismissRequest = { showDeleteArticleDialog = null },
             title = { Text("Hapus Artikel") },
             text = { Text("Apakah Anda yakin ingin menghapus artikel '${articleToDelete.title}'?") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.deleteArticle(articleToDelete)
-                        showDeleteDialog = null
+                        showDeleteArticleDialog = null
                     }
                 ) {
                     Text("Hapus", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = null }) {
+                TextButton(onClick = { showDeleteArticleDialog = null }) {
                     Text("Batal")
                 }
             }
@@ -226,8 +339,6 @@ fun ProfileScreen(
     }
 }
 
-// UserArticleCard composable tetap sama
-// ... (kode UserArticleCard dari respons sebelumnya) ...
 @Composable
 fun UserArticleCard(
     article: Article,
@@ -279,7 +390,11 @@ fun UserArticleCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "Dibuat: ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(article.createdAt)}", // Format tanggal diubah sedikit
+                    text = try {
+                        "Dibuat: ${SimpleDateFormat("dd MMM yy", Locale.getDefault()).format(article.createdAt)}"
+                    } catch (e: Exception) {
+                        "Tanggal tidak valid"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -304,3 +419,4 @@ fun UserArticleCard(
         }
     }
 }
+
