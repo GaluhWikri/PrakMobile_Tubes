@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign // Import TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -205,7 +206,7 @@ fun ArticleListScreen(
             } else if (articles.isEmpty()) { // This now covers "no articles found" for search too
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(300.dp).padding(top=50.dp),
+                        modifier = Modifier.fillMaxWidth().height(300.dp).padding(top=50.dp), // Ensure Box fills width for text centering
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -215,6 +216,7 @@ fun ArticleListScreen(
                                 text = if (searchQuery.isNotBlank()) "No articles found for '$searchQuery'" else "Belum ada artikel",
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center, // Added this line to center the text
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
                         }
