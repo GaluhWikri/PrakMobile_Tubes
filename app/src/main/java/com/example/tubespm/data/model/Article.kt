@@ -1,3 +1,4 @@
+// File: app/src/main/java/com/example/tubespm/data/model/Article.kt
 package com.example.tubespm.data.model
 
 import androidx.room.Entity
@@ -12,5 +13,6 @@ data class Article(
     val imageUrl: String?,
     val createdAt: Date,
     val updatedAt: Date,
-    val authorId: String // Added: Store the author's ID (assuming it's a String like User ID)
+    val authorId: String,
+    val authorName: String // <-- Tambahkan baris ini
 )

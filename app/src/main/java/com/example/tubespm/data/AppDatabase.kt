@@ -16,7 +16,7 @@ import com.example.tubespm.data.model.User
 
 @Database(
     entities = [Article::class, Comment::class, User::class],
-    version = 3,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

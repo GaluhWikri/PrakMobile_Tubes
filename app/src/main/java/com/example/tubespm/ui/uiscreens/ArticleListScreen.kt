@@ -105,7 +105,7 @@ fun ArticleListScreen(
                     .padding(top = 8.dp)
             ) {
                 Text(
-                    "BOOOOOM BLOG",
+                    "BOOOOOM",
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
                     modifier = Modifier.padding(horizontal = 16.dp),
                     color = MaterialTheme.colorScheme.primary

@@ -65,7 +65,8 @@ class BlogRepository @Inject constructor(
             imageUrl = response.imageUrl,
             createdAt = parseApiDateFlexible(response.createdAtApi ?: response.date),
             updatedAt = parseApiDateFlexible(response.updatedAtApi ?: response.createdAtApi ?: response.date),
-            authorId = response.authorId.toString()
+            authorId = response.authorId.toString(),
+            authorName = response.authorName // <-- Tambahkan pemetaan ini
         )
     }
 

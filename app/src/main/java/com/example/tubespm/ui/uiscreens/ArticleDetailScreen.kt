@@ -198,22 +198,21 @@ fun ArticleHeaderImage(article: Article) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(300.dp) // Adjust height as needed
+            .height(300.dp)
     ) {
         AsyncImage(
-            model = article.imageUrl ?: "", // Provide a fallback drawable if needed
+            model = article.imageUrl ?: "",
             contentDescription = "Article Image",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
-        // Scrim overlay for better text readability
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                        startY = 0.6f * 300.dp.value // Start scrim from 60% of height
+                        startY = 0.6f * 300.dp.value
                     )
                 )
         )
@@ -223,30 +222,15 @@ fun ArticleHeaderImage(article: Article) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Category Tag
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Text(
-                    // Placeholder: Use article.category if available, otherwise a placeholder
-                    text = "Technology", // article.categoryName ?: "Technology",
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-
-            // Prominent Title on Image (Using article.title for this example, could be a different field)
+            // ... (Kode untuk Category Tag dan Title tetap sama) ...
             Text(
-                text = article.title, // Or a specific bannerTitle field from Article
+                text = article.title, // Judul Artikel
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 maxLines = 2
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Placeholder for author avatar
                 Icon(
                     imageVector = Icons.Filled.AccountCircle,
                     contentDescription = "Author Avatar",
@@ -255,8 +239,7 @@ fun ArticleHeaderImage(article: Article) {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    // Placeholder: Use article.authorName if available
-                    text = "Author Name", // article.authorName ?: "Unknown Author",
+                    text = article.authorName, // <-- Ubah di sini
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White
                 )
