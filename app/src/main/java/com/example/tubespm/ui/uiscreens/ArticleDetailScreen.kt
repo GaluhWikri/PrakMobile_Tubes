@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.tubespm.data.model.Article
@@ -29,12 +30,12 @@ import com.example.tubespm.ui.viewmodels.ArticleDetailViewModel
 import kotlinx.coroutines.flow.collectLatest
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArticleDetailScreen(
     onNavigateBack: () -> Unit,
-    // onNavigateToEdit: (String) -> Unit, // Dihapus: Parameter ini tidak lagi diperlukan
     viewModel: ArticleDetailViewModel = hiltViewModel()
 ) {
     val article by viewModel.article.collectAsState()
@@ -56,28 +57,25 @@ fun ArticleDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Detail Artikel", fontWeight = FontWeight.Bold) },
+                title = { /* Title removed as per new design */ },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    // Tombol Edit Dihapus dari sini
-                    // article?.let { art ->
-                    //     IconButton(onClick = { onNavigateToEdit(art.id) }) { // Baris ini dihapus
-                    //         Icon(Icons.Default.Edit, contentDescription = "Edit")
-                    //     }
-                    // }
-                    IconButton(onClick = { viewModel.refreshComments() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh Komentar")
+                    IconButton(onClick = { /* TODO: Implement bookmark action */ }) {
+                        Icon(Icons.Default.BookmarkBorder, contentDescription = "Bookmark")
+                    }
+                    IconButton(onClick = { /* TODO: Implement share action */ }) {
+                        Icon(Icons.Default.Share, contentDescription = "Share")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = MaterialTheme.colorScheme.surface, // Or transparent if image goes under
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -85,14 +83,7 @@ fun ArticleDetailScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.background,
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
-                        )
-                    )
-                )
+                .background(MaterialTheme.colorScheme.background) // Changed to a single background color
                 .padding(paddingValues)
         ) {
             if (isLoadingArticle) {
@@ -106,19 +97,23 @@ fun ArticleDetailScreen(
                 article?.let { art ->
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(0.dp) // Adjusted spacing
                     ) {
                         item {
-                            ModernArticleDetailCard(article = art)
+                            ArticleHeaderImage(article = art)
                         }
 
                         item {
+                            ArticleContentCard(article = art, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 "Komentar",
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                             ModernCommentInputSection(
                                 commentText = commentText,
@@ -130,8 +125,10 @@ fun ArticleDetailScreen(
                                         Toast.makeText(context, "Komentar tidak boleh kosong", Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                isSending = isLoadingComments
+                                isSending = isLoadingComments,
+                                modifier = Modifier.padding(horizontal = 16.dp)
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
 
                         if (isLoadingComments && comments.isEmpty()) {
@@ -146,23 +143,27 @@ fun ArticleDetailScreen(
                                     "Belum ada komentar.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(vertical = 20.dp).fillMaxWidth()
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp).fillMaxWidth()
                                 )
                             }
                         } else {
                             items(comments, key = { it.id }) { comment ->
                                 ModernCommentItem(
                                     comment = comment,
-                                    onDelete = { showDeleteCommentDialog = comment }
+                                    onDelete = { showDeleteCommentDialog = comment },
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                                 )
                             }
+                        }
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp)) // Add some padding at the bottom
                         }
                     }
                 } ?: Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Artikel tidak ditemukan atau gagal dimuat.")
+                    Text("Artikel tidak ditemukan atau gagal dimuat.", modifier = Modifier.padding(16.dp))
                 }
             }
         }
@@ -192,19 +193,186 @@ fun ArticleDetailScreen(
     }
 }
 
-// ModernCommentInputSection, ModernCommentItem, dan ModernArticleDetailCard tetap sama
-// ... (kode untuk ModernCommentInputSection, ModernCommentItem, ModernArticleDetailCard dari respons sebelumnya)
+@Composable
+fun ArticleHeaderImage(article: Article) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp) // Adjust height as needed
+    ) {
+        AsyncImage(
+            model = article.imageUrl ?: "", // Provide a fallback drawable if needed
+            contentDescription = "Article Image",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        // Scrim overlay for better text readability
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                        startY = 0.6f * 300.dp.value // Start scrim from 60% of height
+                    )
+                )
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Category Tag
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Text(
+                    // Placeholder: Use article.category if available, otherwise a placeholder
+                    text = "Technology", // article.categoryName ?: "Technology",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+
+            // Prominent Title on Image (Using article.title for this example, could be a different field)
+            Text(
+                text = article.title, // Or a specific bannerTitle field from Article
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+                maxLines = 2
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Placeholder for author avatar
+                Icon(
+                    imageVector = Icons.Filled.AccountCircle,
+                    contentDescription = "Author Avatar",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    // Placeholder: Use article.authorName if available
+                    text = "Author Name", // article.authorName ?: "Unknown Author",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "•",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = formatRelativeTime(article.createdAt),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ArticleContentCard(article: Article, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 0.dp, // Image has no card shadow, this is the content card
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp) // Rounded top corners
+            )
+            .offset(y = (-16).dp), // Pull card up to overlap slightly or sit under rounded image corners
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp) // More top padding
+        ) {
+            Text(
+                text = article.title, // This is the "How Artificial Intelligence Will Shape the Next Decade" title
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(16.dp)) // Increased space
+
+            // If you want to show a formatted date here as well (optional)
+            // Row(
+            //     verticalAlignment = Alignment.CenterVertically,
+            //     horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // ) {
+            //     Icon(
+            //         Icons.Default.CalendarToday,
+            //         contentDescription = "Tanggal publikasi",
+            //         modifier = Modifier.size(16.dp),
+            //         tint = MaterialTheme.colorScheme.onSurfaceVariant
+            //     )
+            //     Text(
+            //         text = "Dipublikasikan: ${SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale.getDefault()).format(article.createdAt)}",
+            //         style = MaterialTheme.typography.bodySmall,
+            //         color = MaterialTheme.colorScheme.onSurfaceVariant
+            //     )
+            // }
+            // Spacer(modifier = Modifier.height(12.dp))
+            // HorizontalDivider(
+            //     thickness = 1.dp,
+            //     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            // )
+            // Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = article.content,
+                style = MaterialTheme.typography.bodyLarge,
+                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.5,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+
+// Helper function for relative time (simplified)
+fun formatRelativeTime(date: Date): String {
+    val now = System.currentTimeMillis()
+    val diff = now - date.time
+
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(diff)
+    val hours = TimeUnit.MILLISECONDS.toHours(diff)
+    val days = TimeUnit.MILLISECONDS.toDays(diff)
+
+    return when {
+        minutes < 1 -> "Just now"
+        minutes < 60 -> "$minutes min ago"
+        hours < 24 -> "$hours hr ago"
+        days < 7 -> "$days days ago"
+        else -> SimpleDateFormat("dd MMM yy", Locale.getDefault()).format(date)
+    }
+}
+
+
+// ModernCommentInputSection, ModernCommentItem remain the same as in your existing code.
+// Ensure they are available in this file or imported correctly.
+
 @Composable
 fun ModernCommentInputSection(
     commentText: String,
     onCommentTextChanged: (String) -> Unit,
     onSendComment: () -> Unit,
-    isSending: Boolean
+    isSending: Boolean,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .shadow(elevation = 4.dp, shape = RoundedCornerShape(12.dp)),
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
@@ -244,21 +412,22 @@ fun ModernCommentInputSection(
 @Composable
 fun ModernCommentItem(
     comment: Comment,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 4.dp) // Keep some vertical padding between comment cards
             .shadow(
-                elevation = 2.dp,
+                elevation = 1.dp, // Reduced shadow
                 shape = RoundedCornerShape(12.dp)
             ),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface // Or surfaceContainerLow
         )
     ) {
         Column(
@@ -343,81 +512,6 @@ fun ModernCommentItem(
                 color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.4
             )
-        }
-    }
-}
-
-@Composable
-fun ModernArticleDetailCard(article: Article) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(16.dp)
-            ),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column {
-            if (!article.imageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = article.imageUrl,
-                    contentDescription = "Article Image",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(
-                    text = article.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        Icons.Default.CalendarToday,
-                        contentDescription = "Tanggal publikasi",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Dipublikasikan: ${SimpleDateFormat("dd MMMM yyyy, HH:mm", Locale.getDefault()).format(article.createdAt)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = article.content,
-                    style = MaterialTheme.typography.bodyLarge,
-                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.5,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
         }
     }
 }
