@@ -478,13 +478,38 @@ fun DiscoverArticleCard(
                     text = article.title,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        lineHeight = 20.sp // Adjust line height if needed
+                        lineHeight = 20.sp
                     ),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface // Ensure text color contrasts with background
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp)) // Jarak setelah judul
+
+                // --- NAMA AUTHOR (DIPINDAHKAN KE ATAS TANGGAL) ---
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Person,
+                        contentDescription = "Author",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = article.authorName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                // --- AKHIR NAMA AUTHOR ---
+
+                Spacer(modifier = Modifier.height(4.dp)) // Jarak antara author dan tanggal
+
+                // --- TANGGAL ---
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -493,10 +518,10 @@ fun DiscoverArticleCard(
                         Icons.Outlined.CalendarToday,
                         contentDescription = "Tanggal",
                         modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant // Use a less prominent color
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = try { // Safely format date
+                        text = try {
                             SimpleDateFormat("dd MMM, yy", Locale.getDefault()).format(article.createdAt)
                         } catch (e: Exception) {
                             "Invalid date"
@@ -505,6 +530,7 @@ fun DiscoverArticleCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                // --- AKHIR TANGGAL ---
             }
         }
     }
