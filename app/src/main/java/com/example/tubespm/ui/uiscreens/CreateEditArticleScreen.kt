@@ -4,7 +4,7 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn // Pastikan ini diimport
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.example.tubespm.ui.theme.BlogTheme // Pastikan tema Anda diimport dengan benar
+import com.example.tubespm.ui.theme.BlogTheme
 import com.example.tubespm.ui.viewmodels.CreateEditArticleViewModel
 import kotlinx.coroutines.flow.collectLatest
 
@@ -49,8 +49,6 @@ fun CreateEditArticleScreen(
         viewModel.saveResult.collectLatest { result ->
             if (result.isSuccess) {
                 showSuccessToast = true
-                // Navigasi kembali hanya jika sukses dan setelah toast mungkin (opsional delay)
-                // Untuk sekarang, navigasi langsung setelah toast diset.
                 onNavigateBack()
             } else {
                 showErrorToast = result.exceptionOrNull()?.message ?: "Gagal menyimpan artikel."
@@ -68,7 +66,7 @@ fun CreateEditArticleScreen(
         showErrorToast = null
     }
 
-    BlogTheme { // Menggunakan BlogTheme Anda
+    BlogTheme {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -79,34 +77,35 @@ fun CreateEditArticleScreen(
                             fontSize = 20.sp
                         )
                     },
-                    navigationIcon = { // Tombol Kembali
+                    navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(
-                                imageVector = Icons.Default.ArrowBack, // Bisa juga ArrowBackIosNew
+                                imageVector = Icons.Default.ArrowBack,
                                 contentDescription = "Kembali",
-                                tint = MaterialTheme.colorScheme.onPrimary // Sesuaikan dengan warna TopAppBar
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     },
-                    actions = { // Tombol Simpan
-                        Button(
+                    actions = {
+                        Button( // TOMBOL SIMPAN
                             onClick = { viewModel.saveArticle() },
                             enabled = !isLoading && title.isNotBlank() && content.isNotBlank() && category.isNotBlank(),
                             modifier = Modifier.padding(end = 12.dp),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary, // Atau warna lain yang kontras
-                                contentColor = MaterialTheme.colorScheme.onSecondary
+                                // --- PERUBAHAN WARNA TOMBOL SIMPAN ---
+                                containerColor = MaterialTheme.colorScheme.primary, // Menggunakan warna primary
+                                contentColor = MaterialTheme.colorScheme.onPrimary    // Warna teks/ikon di tombol Simpan
                             )
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
                                     strokeWidth = 2.5.dp,
-                                    color = MaterialTheme.colorScheme.onSecondary
+                                    color = MaterialTheme.colorScheme.onPrimary
                                 )
                             } else {
-                                Icon(Icons.Filled.Done, contentDescription = "Simpan") // Atau Icons.Filled.Save
+                                Icon(Icons.Filled.Done, contentDescription = "Simpan")
                                 Spacer(Modifier.width(6.dp))
                                 Text("Simpan")
                             }
@@ -115,8 +114,8 @@ fun CreateEditArticleScreen(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary, // Pastikan ini juga diset jika navigation icon butuh warna dari sini
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary // Untuk ikon di dalam Button actions jika Button tidak override
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary // Disesuaikan agar ikon action juga onPrimary
                     )
                 )
             }
@@ -140,7 +139,7 @@ fun CreateEditArticleScreen(
                     )
                 }
 
-                item {
+                item { // Dropdown Kategori
                     ExposedDropdownMenuBox(
                         expanded = categoryDropdownExpanded,
                         onExpandedChange = { categoryDropdownExpanded = !categoryDropdownExpanded },
@@ -158,22 +157,28 @@ fun CreateEditArticleScreen(
                                 .fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                // --- PERUBAHAN WARNA DROPDOWN KATEGORI (FOKUS) ---
+                                focusedBorderColor = MaterialTheme.colorScheme.primary, // Warna border saat fokus (primary)
                                 unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-                                focusedLabelColor = MaterialTheme.colorScheme.primary,
-                                cursorColor = MaterialTheme.colorScheme.primary,
-                                focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                                unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,    // Warna label saat fokus (primary)
+                                cursorColor = MaterialTheme.colorScheme.primary,          // Warna kursor (primary)
+                                focusedLeadingIconColor = MaterialTheme.colorScheme.primary, // Warna ikon leading saat fokus (primary)
+                                unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                         ExposedDropdownMenu(
                             expanded = categoryDropdownExpanded,
                             onDismissRequest = { categoryDropdownExpanded = false },
                             modifier = Modifier.fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh) // Latar belakang menu dropdown
                         ) {
                             availableCategories.forEach { selectionOption ->
                                 DropdownMenuItem(
-                                    text = { Text(selectionOption) },
+                                    text = { Text(selectionOption, color = MaterialTheme.colorScheme.onSurface) },
                                     onClick = {
                                         viewModel.updateCategory(selectionOption)
                                         categoryDropdownExpanded = false
@@ -222,7 +227,7 @@ fun CreateEditArticleScreen(
                         onValueChange = viewModel::updateContent,
                         label = "Konten Artikel",
                         leadingIcon = Icons.Filled.Notes,
-                        modifier = Modifier.defaultMinSize(minHeight = 200.dp), // Memberi tinggi minimal
+                        modifier = Modifier.defaultMinSize(minHeight = 200.dp),
                         singleLine = false,
                         isContentField = true
                     )
@@ -234,6 +239,7 @@ fun CreateEditArticleScreen(
     }
 }
 
+// Composable ModernTextField tetap sama, menggunakan primary color untuk fokus
 @Composable
 fun ModernTextField(
     value: String,
@@ -252,8 +258,8 @@ fun ModernTextField(
         leadingIcon = {
             Icon(
                 leadingIcon,
-                contentDescription = null, // Deskripsi konten untuk ikon bisa null jika dekoratif
-                tint = MaterialTheme.colorScheme.primary
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary // Fokus menggunakan primary
             )
         },
         modifier = modifier.fillMaxWidth(),
@@ -261,11 +267,11 @@ fun ModernTextField(
         maxLines = maxLines,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            focusedBorderColor = MaterialTheme.colorScheme.primary, // Fokus menggunakan primary
             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-            focusedLabelColor = MaterialTheme.colorScheme.primary,
-            cursorColor = MaterialTheme.colorScheme.primary,
-            focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+            focusedLabelColor = MaterialTheme.colorScheme.primary, // Fokus menggunakan primary
+            cursorColor = MaterialTheme.colorScheme.primary, // Fokus menggunakan primary
+            focusedLeadingIconColor = MaterialTheme.colorScheme.primary, // Fokus menggunakan primary
             unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         textStyle = MaterialTheme.typography.bodyLarge.copy(
