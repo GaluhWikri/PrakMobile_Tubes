@@ -48,14 +48,16 @@ class ArticleListViewModel @Inject constructor(
             } else {
                 articlesList.filter { article ->
                     article.title.contains(query, ignoreCase = true) ||
-                            article.content.contains(query, ignoreCase = true) // Optionally search in content
+                            // Tambahkan pengecekan untuk article.authorName
+                            article.authorName.contains(query, ignoreCase = true) ||
+                            article.content.contains(query, ignoreCase = true) // Pencarian berdasarkan konten tetap opsional
                 }
             }
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = emptyList() // Or _allArticles.value if appropriate and safe
+            initialValue = emptyList()
         )
 
     private val _currentUserArticles = MutableStateFlow<List<Article>>(emptyList())
