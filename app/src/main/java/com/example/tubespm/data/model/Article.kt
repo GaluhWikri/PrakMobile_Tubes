@@ -14,5 +14,6 @@ data class Article(
     val createdAt: Date,
     val updatedAt: Date,
     val authorId: String,
-    val authorName: String // <-- Tambahkan baris ini
+    val authorName: String,
+    val category: String
 )

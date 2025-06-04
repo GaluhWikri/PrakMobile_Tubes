@@ -66,9 +66,11 @@ class BlogRepository @Inject constructor(
             createdAt = parseApiDateFlexible(response.createdAtApi ?: response.date),
             updatedAt = parseApiDateFlexible(response.updatedAtApi ?: response.createdAtApi ?: response.date),
             authorId = response.authorId.toString(),
-            authorName = response.authorName // <-- Tambahkan pemetaan ini
+            authorName = response.authorName,
+            category = response.category // <--- PASTIKAN BARIS INI ADA DAN BENAR
         )
     }
+
 
     private fun mapCommentResponseToEntity(response: CommentApiResponse): Comment {
         return Comment(
@@ -127,17 +129,26 @@ class BlogRepository @Inject constructor(
         return null
     }
 
-    suspend fun syncArticles() {
+    suspend fun syncArticles(categoryQuery: String? = null) { // Modified to accept category
         try {
-            val response = apiService.getArticles()
+            // If categoryQuery is "All", send null to API to fetch all articles
+            val effectiveCategory = if (categoryQuery == "All") null else categoryQuery
+            val response = apiService.getArticles(effectiveCategory) // Pass category to API
             if (response.isSuccessful) {
                 response.body()?.let { articleResponses ->
                     val articlesToInsert = articleResponses.map { mapResponseToArticleEntity(it) }
+                    // If filtering, we might want to clear old articles of *other* categories,
+                    // or clear all and re-insert. For simplicity with "All", clear and insert.
+                    // If a specific category is chosen, you might only update/insert those.
+                    // For now, let's assume sync replaces relevant articles.
+                    // If effectiveCategory is null (meaning "All"), perhaps clear all local articles first.
+                    // This part needs careful consideration based on desired offline behavior.
+                    // A simple approach for now:
                     articlesToInsert.forEach { articleDao.insertArticle(it) }
                 }
             }
         } catch (e: Exception) {
-            Log.e("BlogRepository", "Error during article synchronization", e)
+            Log.e("BlogRepository", "Error during article synchronization with category: $categoryQuery", e)
         }
     }
 

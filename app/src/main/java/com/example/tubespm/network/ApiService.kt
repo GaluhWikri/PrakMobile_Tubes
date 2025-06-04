@@ -3,18 +3,16 @@ package com.example.tubespm.network
 import com.example.tubespm.data.model.ArticleRequest
 import com.example.tubespm.data.model.ArticleResponse
 import com.example.tubespm.data.model.AuthResponse
-// import com.example.tubespm.data.model.Comment // Hapus import ini jika tidak digunakan langsung
-import com.example.tubespm.data.model.CommentApiResponse // Import baru
-import com.example.tubespm.data.model.CreateCommentRequest // Import baru
+import com.example.tubespm.data.model.CommentApiResponse
+import com.example.tubespm.data.model.CreateCommentRequest
 import com.example.tubespm.data.model.LoginRequest
 import com.example.tubespm.data.model.RegisterRequest
 import retrofit2.Response
 import retrofit2.http.*
 
 interface ApiService {
-    // ... (Endpoint Artikel, Login, Register, Logout tetap sama) ...
     @GET("articles")
-    suspend fun getArticles(): Response<List<ArticleResponse>>
+    suspend fun getArticles(@Query("kategori") category: String? = null): Response<List<ArticleResponse>> // Modified
 
     @GET("articles/{id}")
     suspend fun getArticle(@Path("id") id: String): Response<ArticleResponse>
@@ -28,21 +26,19 @@ interface ApiService {
     @DELETE("articles/{id}")
     suspend fun deleteArticle(@Path("id") id: String): Response<Unit>
 
-
-    // Endpoint Komentar
-    @GET("articles/{article_id}/comments") // Path parameter API adalah {article} bukan {id}
+    @GET("articles/{article_id}/comments")
     suspend fun getCommentsForArticle(@Path("article_id") articleId: String): Response<List<CommentApiResponse>>
 
     @POST("articles/{article_id}/comments")
     suspend fun createComment(
         @Path("article_id") articleId: String,
         @Body commentRequest: CreateCommentRequest
-    ): Response<CommentApiResponse> // API Laravel mengembalikan comment yang baru dibuat
+    ): Response<CommentApiResponse>
 
     @PUT("comments/{comment_id}")
     suspend fun updateComment(
         @Path("comment_id") commentId: String,
-        @Body commentRequest: CreateCommentRequest // Asumsi request update sama dengan create
+        @Body commentRequest: CreateCommentRequest
     ): Response<CommentApiResponse>
 
     @DELETE("comments/{comment_id}")

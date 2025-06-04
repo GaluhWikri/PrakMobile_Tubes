@@ -4,7 +4,7 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyColumn // Pastikan ini diimport
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -23,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.example.tubespm.ui.theme.BlogTheme // Assuming you have a BlogTheme or similar
+import com.example.tubespm.ui.theme.BlogTheme // Pastikan tema Anda diimport dengan benar
 import com.example.tubespm.ui.viewmodels.CreateEditArticleViewModel
 import kotlinx.coroutines.flow.collectLatest
 
@@ -37,18 +36,21 @@ fun CreateEditArticleScreen(
     val title by viewModel.title.collectAsState()
     val content by viewModel.content.collectAsState()
     val imageUrl by viewModel.imageUrl.collectAsState()
-    val category by viewModel.category.collectAsState() // Assuming you'll add category selection
+    val category by viewModel.category.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val context = LocalContext.current
+    val availableCategories = viewModel.availableCategories
 
+    var categoryDropdownExpanded by remember { mutableStateOf(false) }
     var showSuccessToast by remember { mutableStateOf(false) }
     var showErrorToast by remember { mutableStateOf<String?>(null) }
-
 
     LaunchedEffect(Unit) {
         viewModel.saveResult.collectLatest { result ->
             if (result.isSuccess) {
                 showSuccessToast = true
+                // Navigasi kembali hanya jika sukses dan setelah toast mungkin (opsional delay)
+                // Untuk sekarang, navigasi langsung setelah toast diset.
                 onNavigateBack()
             } else {
                 showErrorToast = result.exceptionOrNull()?.message ?: "Gagal menyimpan artikel."
@@ -58,15 +60,15 @@ fun CreateEditArticleScreen(
 
     if (showSuccessToast) {
         Toast.makeText(context, "Artikel berhasil disimpan!", Toast.LENGTH_SHORT).show()
-        showSuccessToast = false // Reset toast state
+        showSuccessToast = false
     }
 
     showErrorToast?.let {
         Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-        showErrorToast = null // Reset toast state
+        showErrorToast = null
     }
 
-    BlogTheme { // Apply your consistent theme
+    BlogTheme { // Menggunakan BlogTheme Anda
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -74,46 +76,47 @@ fun CreateEditArticleScreen(
                         Text(
                             if (isEditing) "Edit Artikel" else "Buat Artikel Baru",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp // Consistent with other screens
+                            fontSize = 20.sp
                         )
                     },
-                    navigationIcon = {
+                    navigationIcon = { // Tombol Kembali
                         IconButton(onClick = onNavigateBack) {
                             Icon(
-                                Icons.Default.ArrowBackIosNew, // Modern back icon
+                                imageVector = Icons.Default.ArrowBack, // Bisa juga ArrowBackIosNew
                                 contentDescription = "Kembali",
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                tint = MaterialTheme.colorScheme.onPrimary // Sesuaikan dengan warna TopAppBar
                             )
                         }
                     },
-                    actions = {
+                    actions = { // Tombol Simpan
                         Button(
                             onClick = { viewModel.saveArticle() },
-                            enabled = !isLoading && title.isNotBlank() && content.isNotBlank(),
-                            modifier = Modifier.padding(end = 12.dp), // Adjusted padding
-                            shape = RoundedCornerShape(8.dp), // Consistent rounding
+                            enabled = !isLoading && title.isNotBlank() && content.isNotBlank() && category.isNotBlank(),
+                            modifier = Modifier.padding(end = 12.dp),
+                            shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary, // Or another accent color
+                                containerColor = MaterialTheme.colorScheme.secondary, // Atau warna lain yang kontras
                                 contentColor = MaterialTheme.colorScheme.onSecondary
                             )
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp), // Slightly larger for visibility
+                                    modifier = Modifier.size(20.dp),
                                     strokeWidth = 2.5.dp,
                                     color = MaterialTheme.colorScheme.onSecondary
                                 )
                             } else {
-                                Icon(Icons.Filled.Done, contentDescription = "Simpan")
+                                Icon(Icons.Filled.Done, contentDescription = "Simpan") // Atau Icons.Filled.Save
                                 Spacer(Modifier.width(6.dp))
                                 Text("Simpan")
                             }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary, // Consistent TopAppBar color
+                        containerColor = MaterialTheme.colorScheme.primary,
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary, // Pastikan ini juga diset jika navigation icon butuh warna dari sini
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary // Untuk ikon di dalam Button actions jika Button tidak override
                     )
                 )
             }
@@ -121,10 +124,10 @@ fun CreateEditArticleScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background) // Consistent background
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(paddingValues)
-                    .padding(horizontal = 16.dp, vertical = 20.dp), // Added more vertical padding
-                verticalArrangement = Arrangement.spacedBy(18.dp) // Increased spacing between elements
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 item {
                     ModernTextField(
@@ -132,9 +135,54 @@ fun CreateEditArticleScreen(
                         onValueChange = viewModel::updateTitle,
                         label = "Judul Artikel",
                         leadingIcon = Icons.Filled.Title,
-                        singleLine = false, // Allow multiline for longer titles if needed
+                        singleLine = false,
                         maxLines = 3
                     )
+                }
+
+                item {
+                    ExposedDropdownMenuBox(
+                        expanded = categoryDropdownExpanded,
+                        onExpandedChange = { categoryDropdownExpanded = !categoryDropdownExpanded },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = category,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Kategori") },
+                            leadingIcon = { Icon(Icons.Filled.Category, contentDescription = "Kategori") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryDropdownExpanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                cursorColor = MaterialTheme.colorScheme.primary,
+                                focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+                                unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = categoryDropdownExpanded,
+                            onDismissRequest = { categoryDropdownExpanded = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            availableCategories.forEach { selectionOption ->
+                                DropdownMenuItem(
+                                    text = { Text(selectionOption) },
+                                    onClick = {
+                                        viewModel.updateCategory(selectionOption)
+                                        categoryDropdownExpanded = false
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                                )
+                            }
+                        }
+                    }
                 }
 
                 item {
@@ -152,42 +200,35 @@ fun CreateEditArticleScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(220.dp) // Slightly taller image preview
-                                .clip(RoundedCornerShape(12.dp)) // Consistent rounding
+                                .height(220.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .shadow(4.dp, RoundedCornerShape(12.dp)), // Subtle shadow
+                                .shadow(4.dp, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             AsyncImage(
                                 model = imageUrl,
                                 contentDescription = "Preview Gambar Artikel",
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop // Crop to fill bounds
+                                contentScale = ContentScale.Crop
                             )
                         }
                     }
                 }
-                // Placeholder for Category selection if you plan to add it
-                // For now, it's hardcoded in the ViewModel
-                // item {
-                //     // You can add a DropdownMenu or a set of Chips for category selection here
-                //     Text("Kategori: ${category}", style = MaterialTheme.typography.titleMedium)
-                // }
-
 
                 item {
                     ModernTextField(
                         value = content,
                         onValueChange = viewModel::updateContent,
                         label = "Konten Artikel",
-                        leadingIcon = Icons.Filled.Notes, // More appropriate icon
-                        modifier = Modifier.height(350.dp), // Taller content field
+                        leadingIcon = Icons.Filled.Notes,
+                        modifier = Modifier.defaultMinSize(minHeight = 200.dp), // Memberi tinggi minimal
                         singleLine = false,
                         isContentField = true
                     )
                 }
 
-                item { Spacer(modifier = Modifier.height(60.dp)) } // Space for FAB if it overlaps
+                item { Spacer(modifier = Modifier.height(60.dp)) }
             }
         }
     }
@@ -202,7 +243,7 @@ fun ModernTextField(
     modifier: Modifier = Modifier,
     singleLine: Boolean = false,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
-    isContentField: Boolean = false // To allow different alignment for content
+    isContentField: Boolean = false
 ) {
     OutlinedTextField(
         value = value,
@@ -211,14 +252,14 @@ fun ModernTextField(
         leadingIcon = {
             Icon(
                 leadingIcon,
-                contentDescription = null,
+                contentDescription = null, // Deskripsi konten untuk ikon bisa null jika dekoratif
                 tint = MaterialTheme.colorScheme.primary
             )
         },
         modifier = modifier.fillMaxWidth(),
         singleLine = singleLine,
         maxLines = maxLines,
-        shape = RoundedCornerShape(12.dp), // Consistent rounding
+        shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
@@ -229,6 +270,6 @@ fun ModernTextField(
         ),
         textStyle = MaterialTheme.typography.bodyLarge.copy(
             lineHeight = if (isContentField) 24.sp else MaterialTheme.typography.bodyLarge.lineHeight
-        ) // Better line height for content
+        )
     )
 }
