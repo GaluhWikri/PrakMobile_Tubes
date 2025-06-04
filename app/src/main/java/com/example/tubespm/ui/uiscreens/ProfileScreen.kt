@@ -413,7 +413,7 @@ fun UserArticleCard(
                     onClick = onDeleteClick,
                     modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(Icons.Filled.DeleteOutline, contentDescription = "Hapus Artikel", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.Delete, contentDescription = "Hapus Artikel", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }
